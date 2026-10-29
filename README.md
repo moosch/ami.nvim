@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.2.0).** It works and is covered by tests,
+> ⚠️ **Status: early / experimental (v0.2.1).** It works and is covered by tests,
 > but it hasn't been battle-tested in day-to-day interactive use — expect sharp
 > edges, and pin a commit if you depend on it. Feedback and issues welcome.
 
@@ -93,6 +93,13 @@ binary on first run when `go` is available.
 Default inline insert-mode keys (configurable): `<C-g>` request, `<Tab>` accept
 (falls back to a real Tab when none shown), `<C-]>` dismiss.
 
+**Comment-driven completion** works like the original Copilot: write a comment
+describing what you want, put the cursor on the line below it, and press `<C-g>` —
+the comment is part of the FIM prefix, so the model completes the function. (Code
+*after* the cursor is sent as the FIM suffix too, so it fills in context-aware.)
+Set `inline.auto = true` for debounced ghost text as you type instead of on
+keypress.
+
 ## Configuration
 
 Defaults shown; pass overrides to `setup()`:
@@ -116,7 +123,7 @@ require("ami").setup({
     model = "qwen3-coder",
     prewarm = true,                -- load the model on setup so the first completion is fast
     auto = false, debounce_ms = 400,
-    max_tokens = 128, max_lines = 8, temperature = 0.2,
+    max_tokens = 256, max_lines = 0, temperature = 0.2,  -- max_lines 0 = no cap
     context_before_lines = 120, context_after_lines = 60,
     fim = { prefix = "<|fim_prefix|>", suffix = "<|fim_suffix|>", middle = "<|fim_middle|>" },
     keymaps = { trigger = "<C-g>", accept = "<Tab>", dismiss = "<C-]>" },

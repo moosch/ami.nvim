@@ -75,8 +75,8 @@ M.defaults = {
     prewarm = true,   -- fire one tiny request on setup to load the model early
     auto = false,
     debounce_ms = 400,
-    max_tokens = 128,
-    max_lines = 8,
+    max_tokens = 256,   -- enough for a whole function from a comment
+    max_lines = 0,      -- 0 = no line cap; max_tokens bounds length (set >0 to trim)
     temperature = 0.2,
     context_before_lines = 120,
     context_after_lines = 60,

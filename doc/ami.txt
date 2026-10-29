@@ -135,7 +135,7 @@ Defaults (pass overrides to |ami.setup()|): >
         model = "qwen3-coder",
         prewarm = true,             -- load the model on setup (fast first completion)
         auto = false, debounce_ms = 400,
-        max_tokens = 128, max_lines = 8, temperature = 0.2,
+        max_tokens = 256, max_lines = 0, temperature = 0.2,
         context_before_lines = 120, context_after_lines = 60,
         fim = { prefix = "<|fim_prefix|>", suffix = "<|fim_suffix|>",
                 middle = "<|fim_middle|>" },
