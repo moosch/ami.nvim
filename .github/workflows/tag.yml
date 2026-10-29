@@ -17,6 +17,14 @@ jobs:
       - name: Create tag if the version changed
         id: tag
         run: ./scripts/tag-version.sh
+      - name: Create GitHub Release
+        if: steps.tag.outputs.created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "ami ${{ steps.tag.outputs.tag }}" \
+            --generate-notes
       - name: Summary
         if: steps.tag.outputs.created == 'true'
-        run: echo "Created ${{ steps.tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Released ${{ steps.tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
