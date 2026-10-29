@@ -1,0 +1,22 @@
+name: Tag on version bump
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # allows the job to push the tag
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need history + tags to detect existing tags
+      - name: Create tag if the version changed
+        id: tag
+        run: ./scripts/tag-version.sh
+      - name: Summary
+        if: steps.tag.outputs.created == 'true'
+        run: echo "Created ${{ steps.tag.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
