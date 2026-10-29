@@ -1,0 +1,165 @@
+*ami.txt*            An IDE-resident AI pair programmer (advisor, not actor)
+
+==============================================================================
+CONTENTS                                                      *ami-contents*
+
+  1. Introduction ............................... |ami-introduction|
+  2. Requirements ............................... |ami-requirements|
+  3. Installation ............................... |ami-installation|
+  4. Setup ...................................... |ami-setup|
+  5. Commands ................................... |ami-commands|
+  6. Configuration .............................. |ami-configuration|
+  7. How it works ............................... |ami-architecture|
+  8. Health ..................................... |ami-health|
+
+==============================================================================
+1. INTRODUCTION                                           *ami-introduction*
+
+ami is a Neovim plugin pairing you with a local LLM (via LM Studio) that
+*advises, never acts*. It discusses problems, surfaces trade-offs, offers
+inline completions, and occasionally a proactive suggestion — but it never
+edits your files. You stay in control.
+
+It is a Lua plugin plus a small Go daemon (`amid`). The daemon holds the
+intelligence (context assembly, history, LLM proxying); Neovim is a thin client.
+
+==============================================================================
+2. REQUIREMENTS                                           *ami-requirements*
+
+  - Neovim >= 0.10 (uses |vim.system()|, |vim.uv|, |vim.fs.root()|)
+  - Go (to build the daemon; auto-built on first run if present)
+  - curl on $PATH
+  - LM Studio (or any OpenAI-compatible server) with a model loaded
+  - Linux (developed on macOS too). Windows is not supported.
+
+==============================================================================
+3. INSTALLATION                                           *ami-installation*
+
+lazy.nvim: >
+    {
+      "moosch/ami.nvim",
+      build = "make build",       -- compiles the Go daemon
+      config = function()
+        require("ami").setup({})
+      end,
+    }
+<
+The `build` step compiles `amid`. If omitted, the plugin auto-builds it on
+first run when `go` is available.
+
+==============================================================================
+4. SETUP                                                         *ami-setup*
+
+                                                              *ami.setup()*
+require("ami").setup({opts})
+
+Call once. Registers commands, configures inline completion, and starts the
+managed daemon (unless `daemon.auto_start = false`). See
+|ami-configuration| for {opts}.
+
+==============================================================================
+5. COMMANDS                                                   *ami-commands*
+
+                                                                  *:AmiChat*
+:AmiChat          Toggle the chat panel (floating transcript + prompt).
+                      In the prompt: <CR> (normal mode) sends, <C-n> new
+                      session, q / <Esc> hides it (draft preserved).
+
+                                                                   *:AmiAsk*
+:AmiAsk {text}    One-shot question. In visual mode also sends the
+                      selection (and its LSP dependencies) as context.
+
+                                                            *:AmiNewSession*
+:AmiNewSession [name]
+                      Start a fresh conversation.
+
+                                                                  *:AmiTree*
+:AmiTree          Open the conversation tree: branch, switch branches, and
+                      summarize. Keys: <CR> switch, s summarize, r refresh, q.
+
+                                                              *:AmiComplete*
+:AmiComplete      Request an inline (ghost-text) FIM completion.
+
+                                                            *:AmiInlineAuto*
+:AmiInlineAuto    Toggle inline auto-trigger (debounced as-you-type).
+
+                                                                 *:AmiModel*
+:AmiModel [chat|fim]
+                      Select the chat or FIM model at runtime (live list from
+                      LM Studio). No argument prompts for which first.
+
+                                                                *:AmiModels*
+:AmiModels        Show the current chat and FIM model selections.
+
+                                                             *:AmiProactive*
+:AmiProactive     Toggle proactive suggestions on/off (off by default).
+
+                                                                 *:AmiNudge*
+:AmiNudge         Request a proactive suggestion now.
+
+                                                                *:AmiDaemon*
+:AmiDaemon [start|stop|restart]
+                      Control the managed daemon (default restart).
+
+                                                                *:AmiHealth*
+:AmiHealth        Ping the daemon and report its status.
+
+                                                                   *:AmiLog*
+:AmiLog           Open the log viewer. *:AmiDebug* toggles verbose logs.
+
+Default inline insert-mode keys (configurable): <C-g> request, <Tab> accept
+(falls back to a real Tab when no suggestion), <C-]> dismiss.
+
+==============================================================================
+6. CONFIGURATION                                         *ami-configuration*
+
+Defaults (pass overrides to |ami.setup()|): >
+    require("ami").setup({
+      daemon_url = "http://127.0.0.1:8787",
+      chat_model = "qwen3-coder",   -- default; change live with :AmiModel
+      session_dir = nil,            -- nil = stdpath("data")/ami
+                                    --  ""  = each project's ./.ami/sessions
+      daemon = {
+        auto_start = true, auto_build = true, bin = nil,
+      },
+      context = {
+        lsp_deps = true, dep_max_files = 5,
+        dep_timeout_ms = 1500, dep_max_positions = 30,
+      },
+      inline = {
+        enabled = true,
+        endpoint = "http://localhost:1234/v1",  -- LM Studio, direct
+        model = "qwen3-coder",
+        auto = false, debounce_ms = 400,
+        max_tokens = 128, max_lines = 8, temperature = 0.2,
+        context_before_lines = 120, context_after_lines = 60,
+        fim = { prefix = "<|fim_prefix|>", suffix = "<|fim_suffix|>",
+                middle = "<|fim_middle|>" },
+        keymaps = { trigger = "<C-g>", accept = "<Tab>", dismiss = "<C-]>" },
+      },
+      proactive = {
+        enabled = false, on_idle = true, idle_ms = 20000,
+        on_save = true, min_interval_s = 180,
+        require_normal_mode = true, notify = true,
+      },
+    })
+<
+==============================================================================
+7. HOW IT WORKS                                           *ami-architecture*
+
+  Neovim (Lua)  --HTTP+SSE-->  amid (Go)  --OpenAI API-->  LM Studio
+
+The daemon is reference-counted across Neovim instances: it is shared while any
+instance is attached and stopped only when the last one exits. Inline completion
+talks to LM Studio directly (not through the daemon) to keep latency low.
+
+Conversation history is a branching tree stored under `session_dir`
+(default stdpath("data")/ami/<project>/), kept out of your repositories.
+
+==============================================================================
+8. HEALTH                                                       *ami-health*
+
+Run `:checkhealth ami` to verify Neovim version, curl, Go, the daemon
+binary, the daemon, and LM Studio reachability.
+
+vim:tw=78:ts=8:ft=help:norl:
