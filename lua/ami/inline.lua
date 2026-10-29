@@ -103,8 +103,10 @@ local function postprocess(text, max_lines)
 end
 
 -- Request a completion and call cb(text|nil). No mode/position gating here;
--- callers decide whether to render. Exposed for testing.
-function M._request(bufnr, win, cb)
+-- callers decide whether to render. `silent` keeps failures to debug-level (used
+-- by auto-trigger so it never spams); manual triggers surface errors. Exposed for
+-- testing.
+function M._request(bufnr, win, cb, silent)
   local c = cfg()
   local prefix, suffix, row, col = M._context(bufnr, win)
   local fim = c.fim or {}
@@ -119,16 +121,30 @@ function M._request(bufnr, win, cb)
     stream = false,
   }
   local url = (c.endpoint or ""):gsub("/$", "") .. "/completions"
-  log.debug(("inline: POST %s (prefix=%d, suffix=%d bytes)"):format(url, #prefix, #suffix))
+  local timeout_s = math.max(1, math.floor((c.timeout_ms or 20000) / 1000))
+  log.debug(("inline: POST %s (prefix=%d, suffix=%d bytes, timeout=%ds)"):format(url, #prefix, #suffix, timeout_s))
 
   if inflight then
     pcall(function() inflight:kill(9) end)
     inflight = nil
   end
 
+  -- Report a failure: quiet (debug) for auto-trigger, loud (notify) for manual.
+  local function fail(reason)
+    if silent then
+      log.debug("inline: " .. reason)
+    else
+      log.warn("inline: " .. reason) -- log.warn also notifies
+    end
+    cb(nil, row, col)
+  end
+
+  local uv = vim.uv or vim.loop
+  local start = uv.hrtime()
+
   inflight = vim.system(
     {
-      "curl", "-sS", "-m", tostring((c.timeout_ms or 10000) / 1000),
+      "curl", "-sS", "-m", tostring(timeout_s),
       "-X", "POST", "-H", "Content-Type: application/json",
       "-d", vim.json.encode(body), url,
     },
@@ -136,20 +152,29 @@ function M._request(bufnr, win, cb)
     function(res)
       vim.schedule(function()
         inflight = nil
+        local ms = math.floor((uv.hrtime() - start) / 1e6)
         if res.code ~= 0 then
-          log.debug(("inline: curl exit %d — %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
-          return cb(nil, row, col)
+          if res.code == 28 then
+            return fail(("request timed out after %ds — is the model loaded? The first completion can be slow while LM Studio loads it; try again once it's warm, raise inline.timeout_ms, or use a smaller FIM model."):format(timeout_s))
+          elseif res.code == 7 then
+            return fail("could not connect to " .. url .. " — check inline.endpoint (your LM Studio address)")
+          end
+          return fail(("curl exit %d: %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
         end
         local ok, data = pcall(vim.json.decode, res.stdout)
+        if ok and type(data) == "table" and data.error then
+          local em = type(data.error) == "table" and (data.error.message or vim.inspect(data.error)) or tostring(data.error)
+          return fail("server error: " .. em)
+        end
         if not ok or not (data.choices and data.choices[1]) then
-          log.warn("inline: bad completion response")
-          return cb(nil, row, col)
+          return fail("unexpected response: " .. tostring(res.stdout):sub(1, 200))
         end
-        local text = data.choices[1].text or ""
-        text = postprocess(text, c.max_lines)
+        local text = postprocess(data.choices[1].text or "", c.max_lines)
         if vim.trim(text) == "" then
+          log.debug(("inline: empty completion (%dms)"):format(ms))
           return cb(nil, row, col)
         end
+        log.debug(("inline: completion in %dms (%d chars)"):format(ms, #text))
         cb(text, row, col)
       end)
     end
@@ -160,7 +185,9 @@ end
 -- Public actions -------------------------------------------------------------
 
 --- Request a suggestion for the current buffer and show it as ghost text.
-function M.trigger()
+--- `silent` (used by auto-trigger) keeps failures quiet.
+---@param silent boolean|nil
+function M.trigger(silent)
   local bufnr = vim.api.nvim_get_current_buf()
   local win = vim.api.nvim_get_current_win()
   if vim.bo[bufnr].buftype ~= "" then
@@ -187,7 +214,7 @@ function M.trigger()
       return
     end
     M.show(bufnr, row, col, text)
-  end)
+  end, silent)
 end
 
 --- Accept the current suggestion, inserting it at the cursor. Returns true if
@@ -226,7 +253,7 @@ local function schedule_auto()
   end
   auto_timer = vim.defer_fn(function()
     if vim.api.nvim_get_mode().mode:sub(1, 1) == "i" then
-      M.trigger()
+      M.trigger(true) -- auto-trigger: keep failures quiet
     end
   end, cfg().debounce_ms or 400)
 end

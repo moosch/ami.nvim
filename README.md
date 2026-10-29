@@ -126,6 +126,14 @@ a different model family. For snappy as-you-type completion, a smaller FIM model
 (e.g. `deepseek-coder-6.7b-instruct`) is much faster than a 30B chat model, at the
 cost of a second model resident in VRAM.
 
+**Inline not appearing?** First, make sure `inline.endpoint` points at your LM
+Studio (it defaults to `http://localhost:1234/v1`, so set it if LM Studio runs
+elsewhere). Turn on `:AmiDebug`, press `<C-g>`, and check `:AmiLog` — inline now
+reports the exact cause (connection refused, timeout, server error). The **first**
+completion is often a timeout while LM Studio loads the model into VRAM; it works
+once the model is warm. Raise `inline.timeout_ms` or use a smaller FIM model if
+cold loads routinely exceed the limit.
+
 The daemon also reads these environment variables (the plugin sets them for you
 from the config above): `AMI_ADDR`, `AMI_LMSTUDIO_URL`,
 `AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`, `AMI_DATA_DIR`.
