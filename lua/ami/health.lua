@@ -50,11 +50,20 @@ function M.check()
     h.info("daemon not running yet — it starts on setup()")
   end
 
-  local ep = (cfg.inline or {}).endpoint or ""
-  if sync_get(ep .. "/models") then
-    h.ok("LM Studio reachable at " .. ep)
-  else
-    h.error("LM Studio not reachable at " .. ep .. " — start LM Studio or fix the endpoint")
+  -- Check each configured provider (chat and inline may differ), de-duplicated.
+  local checked = {}
+  for _, p in ipairs({
+    { label = "chat", ep = (cfg.chat or {}).endpoint or "" },
+    { label = "inline", ep = (cfg.inline or {}).endpoint or "" },
+  }) do
+    if p.ep ~= "" and not checked[p.ep] then
+      checked[p.ep] = true
+      if sync_get(p.ep .. "/models") then
+        h.ok(("%s provider reachable at %s"):format(p.label, p.ep))
+      else
+        h.error(("%s provider not reachable at %s — start it or fix the endpoint"):format(p.label, p.ep))
+      end
+    end
   end
 end
 

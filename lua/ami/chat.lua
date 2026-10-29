@@ -202,7 +202,7 @@ local function send(message, selection, range)
     client.stream("/chat", {
       session_id = M.session_id,
       message = message,
-      model = config.options.chat_model,
+      model = (config.options.chat or {}).model,
       context = ctx,
     }, {
       on_token = function(c)

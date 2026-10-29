@@ -143,12 +143,12 @@ local function build_env()
   if addr ~= "" then
     env.AMI_ADDR = addr
   end
-  local lmurl = (config.options.inline or {}).endpoint
-  if lmurl and lmurl ~= "" then
-    env.AMI_LMSTUDIO_URL = lmurl
+  local chat = config.options.chat or {}
+  if chat.endpoint and chat.endpoint ~= "" then
+    env.AMI_LMSTUDIO_URL = chat.endpoint
   end
-  if config.options.chat_model and config.options.chat_model ~= "" then
-    env.AMI_CHAT_MODEL = config.options.chat_model
+  if chat.model and chat.model ~= "" then
+    env.AMI_CHAT_MODEL = chat.model
   end
   -- Session storage: nil -> stdpath("data")/ami (out of the user's repos);
   -- "" -> leave unset so the daemon uses each project's own .ami dir.

@@ -21,7 +21,7 @@ local function req_base()
   return {
     session_id = chat.session_id,
     project_root = chat.project_root(),
-    model = config.options.chat_model, -- used by /summarize; ignored elsewhere
+    model = (config.options.chat or {}).model, -- used by /summarize; ignored elsewhere
   }
 end
 

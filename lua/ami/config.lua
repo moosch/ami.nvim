@@ -23,15 +23,23 @@ local M = {}
 ---@field stop string[] Stop sequences.
 ---@field keymaps table { trigger, accept, dismiss } insert-mode keys.
 
+---@class AmiChatConfig
+---@field endpoint string OpenAI-compatible base URL for the chat/advisor provider.
+---@field model string Chat model name (change live with :AmiModel).
+
 ---@class AmiConfig
 ---@field daemon_url string Base URL of the amid daemon.
+---@field chat AmiChatConfig
 ---@field context AmiContextConfig
 ---@field inline AmiInlineConfig
 M.defaults = {
   daemon_url = "http://127.0.0.1:8787",
-  -- Default chat model (the fallback/initial value; change it live with the
-  -- model selector, :AmiModel). Empty string = use the daemon's default.
-  chat_model = "qwen3-coder",
+  -- The chat/advisor provider. Chat requests go through the amid daemon to this
+  -- endpoint. It can be a different provider/model from inline completion below.
+  chat = {
+    endpoint = "http://localhost:1234/v1",
+    model = "qwen3-coder", -- change live with :AmiModel
+  },
   -- Where conversation history is stored. nil = stdpath("data")/ami
   -- (outside your repos). Set to a path to override, or "" to use each project's
   -- own .ami/sessions directory.
@@ -64,6 +72,7 @@ M.defaults = {
     enabled = true,
     endpoint = "http://localhost:1234/v1",
     model = "qwen3-coder",
+    prewarm = true,   -- fire one tiny request on setup to load the model early
     auto = false,
     debounce_ms = 400,
     max_tokens = 128,
@@ -93,7 +102,17 @@ M.options = vim.deepcopy(M.defaults)
 --- Merge user options over the defaults.
 ---@param opts table|nil
 function M.setup(opts)
-  M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts or {})
+  opts = opts or {}
+  M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
+
+  -- Back-compat: the old top-level `chat_model` is now `chat.model`.
+  if opts.chat_model and not (opts.chat and opts.chat.model) then
+    M.options.chat.model = opts.chat_model
+    vim.schedule(function()
+      vim.notify("ami: `chat_model` is deprecated — use `chat = { model = ... }`", vim.log.levels.WARN)
+    end)
+  end
+
   return M.options
 end
 

@@ -9,12 +9,20 @@ local log = require("ami.log")
 
 local M = {}
 
---- Current models: chat (fallback to daemon default) and FIM.
+--- Current model selections for chat and FIM.
 function M.get()
   return {
-    chat = config.options.chat_model,
+    chat = (config.options.chat or {}).model,
     fim = (config.options.inline or {}).model,
   }
+end
+
+-- The provider endpoint backing each target (chat and inline may differ).
+local function endpoint(target)
+  if target == "fim" then
+    return (config.options.inline or {}).endpoint
+  end
+  return (config.options.chat or {}).endpoint
 end
 
 local function set(target, choice)
@@ -22,16 +30,17 @@ local function set(target, choice)
     config.options.inline = config.options.inline or {}
     config.options.inline.model = choice
   else
-    config.options.chat_model = choice
+    config.options.chat = config.options.chat or {}
+    config.options.chat.model = choice
   end
   log.info(("models: %s model → %s"):format(target, choice))
   vim.notify(("ami: %s model → %s"):format(target, choice), vim.log.levels.INFO)
 end
 
---- Pick a model for `target` ("chat" or "fim") from the live LM Studio list.
+--- Pick a model for `target` ("chat" or "fim") from its provider's live list.
 ---@param target "chat"|"fim"
 function M.select(target)
-  client.models(function(ok, ids)
+  client.models_from(endpoint(target), function(ok, ids)
     if not ok then
       log.error("models: " .. tostring(ids))
       return
@@ -42,7 +51,7 @@ function M.select(target)
     end
     local current = M.get()[target]
     vim.ui.select(ids, {
-      prompt = ("Select %s model (current: %s):"):format(target, current or "daemon default"),
+      prompt = ("Select %s model (current: %s):"):format(target, current or "unset"),
       format_item = function(item)
         -- Mark the currently selected model so it stands out in the picker.
         return (item == current and "● " or "  ") .. item
@@ -68,7 +77,7 @@ end
 function M.show()
   local m = M.get()
   vim.notify(("ami models — chat: %s · fim: %s"):format(
-    m.chat or "(daemon default)", m.fim or "(none)"), vim.log.levels.INFO)
+    m.chat or "(unset)", m.fim or "(none)"), vim.log.levels.INFO)
 end
 
 return M

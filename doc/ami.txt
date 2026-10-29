@@ -116,7 +116,10 @@ Default inline insert-mode keys (configurable): <C-g> request, <Tab> accept
 Defaults (pass overrides to |ami.setup()|): >
     require("ami").setup({
       daemon_url = "http://127.0.0.1:8787",
-      chat_model = "qwen3-coder",   -- default; change live with :AmiModel
+      chat = {                      -- chat/advisor provider (via the daemon)
+        endpoint = "http://localhost:1234/v1",
+        model = "qwen3-coder",      -- change live with :AmiModel
+      },
       session_dir = nil,            -- nil = stdpath("data")/ami
                                     --  ""  = each project's ./.ami/sessions
       daemon = {
@@ -126,10 +129,11 @@ Defaults (pass overrides to |ami.setup()|): >
         lsp_deps = true, dep_max_files = 5,
         dep_timeout_ms = 1500, dep_max_positions = 30,
       },
-      inline = {
+      inline = {                    -- completion provider (direct; may differ from chat)
         enabled = true,
-        endpoint = "http://localhost:1234/v1",  -- LM Studio, direct
+        endpoint = "http://localhost:1234/v1",
         model = "qwen3-coder",
+        prewarm = true,             -- load the model on setup (fast first completion)
         auto = false, debounce_ms = 400,
         max_tokens = 128, max_lines = 8, temperature = 0.2,
         context_before_lines = 120, context_after_lines = 60,

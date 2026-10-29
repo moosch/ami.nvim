@@ -55,6 +55,7 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
   config = function()
     require("ami").setup({
       -- point inline/daemon at your LM Studio if it isn't on localhost:
+      -- chat   = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
       -- inline = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
     })
   end,
@@ -99,15 +100,21 @@ Defaults shown; pass overrides to `setup()`:
 ```lua
 require("ami").setup({
   daemon_url = "http://127.0.0.1:8787",
-  chat_model = "qwen3-coder",      -- default; change live with :AmiModel
+  -- Chat/advisor provider (used via the daemon). Can be a different
+  -- provider/model from inline completion below.
+  chat = {
+    endpoint = "http://localhost:1234/v1",
+    model = "qwen3-coder",         -- change live with :AmiModel
+  },
   session_dir = nil,               -- nil = stdpath("data")/ami (out of your repos)
                                    --  "" = each project's ./.ami/sessions
   daemon = { auto_start = true, auto_build = true, bin = nil },
   context = { lsp_deps = true, dep_max_files = 5, dep_timeout_ms = 1500, dep_max_positions = 30 },
   inline = {
     enabled = true,
-    endpoint = "http://localhost:1234/v1",   -- LM Studio, direct (low latency)
+    endpoint = "http://localhost:1234/v1",   -- inline talks here directly (low latency)
     model = "qwen3-coder",
+    prewarm = true,                -- load the model on setup so the first completion is fast
     auto = false, debounce_ms = 400,
     max_tokens = 128, max_lines = 8, temperature = 0.2,
     context_before_lines = 120, context_after_lines = 60,
@@ -121,10 +128,16 @@ require("ami").setup({
 })
 ```
 
+**Chat and inline are independent providers.** `chat.endpoint`/`chat.model` back
+the advisor (through the daemon); `inline.endpoint`/`inline.model` back completion
+(direct). Point them at the same LM Studio, or at two different
+providers/models entirely.
+
 The FIM tokens default to Qwen's format; set `inline.fim`/`inline.stop` to match
 a different model family. For snappy as-you-type completion, a smaller FIM model
 (e.g. `deepseek-coder-6.7b-instruct`) is much faster than a 30B chat model, at the
-cost of a second model resident in VRAM.
+cost of a second model resident in VRAM. `inline.prewarm` loads the FIM model on
+setup so your first completion doesn't pay the cold-start cost.
 
 **Inline not appearing?** First, make sure `inline.endpoint` points at your LM
 Studio (it defaults to `http://localhost:1234/v1`, so set it if LM Studio runs
@@ -134,9 +147,10 @@ completion is often a timeout while LM Studio loads the model into VRAM; it work
 once the model is warm. Raise `inline.timeout_ms` or use a smaller FIM model if
 cold loads routinely exceed the limit.
 
-The daemon also reads these environment variables (the plugin sets them for you
-from the config above): `AMI_ADDR`, `AMI_LMSTUDIO_URL`,
-`AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`, `AMI_DATA_DIR`.
+The daemon also reads these environment variables (the plugin sets them from the
+config above — `AMI_LMSTUDIO_URL`/`AMI_CHAT_MODEL` come from `chat`):
+`AMI_ADDR`, `AMI_LMSTUDIO_URL`, `AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`,
+`AMI_DATA_DIR`.
 
 ## Where history is stored
 

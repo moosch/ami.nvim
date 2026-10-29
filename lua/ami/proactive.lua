@@ -68,7 +68,7 @@ function P.nudge(force)
   context.gather_async(buf, win, nil, nil, function(ctx)
     client.post_json("/nudge", {
       session_id = chat.session_id,
-      model = config.options.chat_model,
+      model = (config.options.chat or {}).model,
       context = ctx,
     }, function(ok, data)
       P.pending = false

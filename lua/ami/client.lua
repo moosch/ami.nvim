@@ -67,6 +67,39 @@ function M.models(cb)
   )
 end
 
+--- GET <endpoint>/models directly from an OpenAI-compatible provider.
+--- cb(ok, { ids }). Used by the model selector so chat and inline can list from
+--- their own (possibly different) providers.
+---@param endpoint string base URL, e.g. "http://localhost:1234/v1"
+---@param cb fun(ok: boolean, ids: string[]|string)
+function M.models_from(endpoint, cb)
+  local url = (endpoint or ""):gsub("/+$", "") .. "/models"
+  vim.system(
+    { "curl", "-sS", "-m", "10", url },
+    { text = true },
+    function(res)
+      vim.schedule(function()
+        if res.code ~= 0 then
+          cb(false, "curl exit " .. res.code .. ": " .. (res.stderr or ""))
+          return
+        end
+        local ok, data = pcall(vim.json.decode, res.stdout)
+        if not ok or type(data) ~= "table" or type(data.data) ~= "table" then
+          cb(false, "bad JSON from " .. url .. ": " .. tostring(res.stdout))
+          return
+        end
+        local ids = {}
+        for _, m in ipairs(data.data) do
+          if m.id then
+            ids[#ids + 1] = m.id
+          end
+        end
+        cb(true, ids)
+      end)
+    end
+  )
+end
+
 --- POST a JSON body and decode a single JSON response. cb(ok, data|errmsg).
 ---@param path string
 ---@param body table

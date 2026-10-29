@@ -266,6 +266,45 @@ function M.toggle_auto()
   vim.notify("ami inline: auto-trigger " .. (c.auto and "on" or "off"), vim.log.levels.INFO)
 end
 
+--- Fire one tiny FIM request so LM Studio loads the model before the first real
+--- completion, turning the cold-start timeout into a one-time background load.
+--- Fire-and-forget; the result is discarded.
+function M.prewarm()
+  local c = cfg()
+  if c.enabled == false or c.prewarm == false then
+    return
+  end
+  local fim = c.fim or {}
+  local body = {
+    model = c.model,
+    prompt = (fim.prefix or "") .. "def _ami_warmup():\n    " .. (fim.suffix or "") .. (fim.middle or ""),
+    max_tokens = 1,
+    temperature = 0,
+    stream = false,
+  }
+  local url = (c.endpoint or ""):gsub("/$", "") .. "/completions"
+  log.debug("inline: pre-warming model at " .. url)
+  local uv = vim.uv or vim.loop
+  local start = uv.hrtime()
+  vim.system(
+    {
+      "curl", "-sS", "-m", "120", "-X", "POST",
+      "-H", "Content-Type: application/json", "-d", vim.json.encode(body), url,
+    },
+    { text = true },
+    function(res)
+      vim.schedule(function()
+        local ms = math.floor((uv.hrtime() - start) / 1e6)
+        if res.code == 0 then
+          log.info(("inline: model warmed in %dms"):format(ms))
+        else
+          log.debug(("inline: pre-warm failed (curl exit %d) — model will load on first use"):format(res.code))
+        end
+      end)
+    end
+  )
+end
+
 -- Setup ----------------------------------------------------------------------
 
 --- Configure inline completion: highlight, keymaps, and autocmds. Idempotent.
@@ -308,6 +347,9 @@ function M.setup()
       end
     end,
   })
+
+  -- Load the model in the background so the first real completion is fast.
+  vim.defer_fn(M.prewarm, 500)
 end
 
 return M
