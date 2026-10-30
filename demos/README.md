@@ -8,11 +8,24 @@ the **source** for the GIFs shown in the main README. GitHub does not render a
 .tape  ──vhs──▶  .gif  ──git add / commit──▶  shown in README
 ```
 
+These are **examples of core + the first-party extensions**: `demos/init.lua` loads
+ami core together with the extensions each demo needs. The GIFs are not of core
+alone.
+
+| Tape | Shows | Extension used |
+| --- | --- | --- |
+| `inline.tape` | comment-driven FIM completion | [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) |
+| `chat.tape` | the chat advisor panel | [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) |
+| `model.tape` | the model registry / `:AmiModel` | core, with `chat`/`fim` slots from the two above |
+
 ## Prerequisites
 
 - `vhs` (`brew install vhs` — pulls in `ttyd` and `ffmpeg`)
 - `gifsicle` (optional, for smaller files: `brew install gifsicle`)
 - A running **LM Studio** with a model loaded — the GIFs show real responses.
+- The extension repos above **checked out next to this one** (siblings of the ami
+  repo): `demos/init.lua` adds `../ami-chat.nvim` and `../ami-inline.nvim` to the
+  runtimepath and loads whichever it finds.
 
 ## Render
 

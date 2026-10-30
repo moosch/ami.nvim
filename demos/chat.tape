@@ -1,6 +1,10 @@
-# ami — chat advisor panel (advice, not action)
+# ami — chat advisor panel (advice, not action)  [EXAMPLE]
 #
-# Record with:  vhs demos/chat.tape   (needs `vhs` + a running LM Studio)
+# Demonstrates the ami-chat.nvim extension (https://github.com/moosch/ami-chat.nvim),
+# loaded by demos/init.lua alongside ami core.
+#
+# Record with:  vhs demos/chat.tape   (needs `vhs` + a running LM Studio, and
+# ami-chat.nvim checked out next to this repo).
 #
 # The advisor panel is right-docked and semi-transparent by default, so the
 # source file stays visible (and shows faintly through the panel). This demo

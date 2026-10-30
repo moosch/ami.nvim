@@ -1,6 +1,12 @@
-# ami — runtime model selector (:AmiModel)
+# ami — runtime model registry / selector (:AmiModel)  [EXAMPLE]
 #
-# Record with:  vhs demos/model.tape   (needs `vhs` + a running LM Studio)
+# The selector is core, but the slots it lists come from extensions: this demo
+# loads ami-chat.nvim (https://github.com/moosch/ami-chat.nvim) and ami-inline.nvim
+# (https://github.com/moosch/ami-inline.nvim) via demos/init.lua, so it shows the
+# default / chat / fim slots.
+#
+# Record with:  vhs demos/model.tape   (needs `vhs` + a running LM Studio, and
+# those extension repos checked out next to this one).
 #
 # Uses Neovim's built-in vim.ui.select (the demo config has no picker plugin),
 # which is a numbered inputlist: type a number, press Enter. If you use
@@ -29,13 +35,14 @@ Sleep 3s
 Show
 Sleep 1s
 
-# --- open the selector: choose a target (1 = chat), then a model ---
+# --- open the selector: choose a slot, then a model ---
+# Slots are listed in registration order: 1=default, 2=chat, 3=fim. Pick chat (2).
 Type ":AmiModel"
 Enter
 Sleep 1500ms
-Type "1"
+Type "2"
 Enter
-Sleep 2500ms      # fetch the model list from the provider
+Sleep 2500ms      # fetch the model list from the slot's provider
 
 # pick a model by number (the current one is marked ●) — adjust to taste
 Type "2"

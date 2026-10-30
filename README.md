@@ -92,22 +92,33 @@ chat panel.
 
 ## Demos
 
-Inline, comment-driven completion — write a comment, trigger, accept:
+These are **examples of core + the first-party extensions working together** — each
+demo uses the extension linked beside it (installed in `demos/init.lua`), not core
+alone.
+
+Inline, comment-driven completion — write a comment, trigger, accept
+([`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim)):
 
 ![inline completion demo](demos/inline.gif)
 
-Chat advisor — discuss a problem, get advice-only feedback:
+Chat advisor — discuss a problem, get advice-only feedback
+([`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim)):
 
 ![chat advisor demo](demos/chat.gif)
 
-Runtime model selector — swap chat/FIM models on the fly:
+Runtime model registry — pick the model for any slot
+(core `:AmiModel`; the `chat`/`fim` slots come from
+[`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) /
+[`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim)):
 
 ![model selector demo](demos/model.gif)
 
 > These GIFs are rendered from [VHS](https://github.com/charmbracelet/vhs) tapes in
-> `demos/`. Regenerate them with `make demos` (needs `vhs` and a running LM Studio;
-> set `AMI_ENDPOINT` for a non-localhost server). Tune the `Sleep` lines in each
-> `.tape` to match your model's latency.
+> `demos/`, which load core plus the extensions above via `demos/init.lua`.
+> Regenerate them with `make demos` (needs `vhs`, a running LM Studio, and the
+> extension repos checked out next to this one; set `AMI_ENDPOINT` for a
+> non-localhost server). Tune the `Sleep` lines in each `.tape` to your model's
+> latency.
 
 ## Commands
 

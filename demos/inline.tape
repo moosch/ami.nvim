@@ -1,7 +1,11 @@
-# ami — inline (FIM) comment-driven completion
+# ami — inline (FIM) comment-driven completion  [EXAMPLE]
 #
-# Record with:  vhs demos/inline.tape   (needs `vhs` + a running LM Studio)
-# Set AMI_ENDPOINT etc. in your shell first if LM Studio isn't on localhost.
+# Demonstrates the ami-inline.nvim extension (https://github.com/moosch/ami-inline.nvim),
+# loaded by demos/init.lua alongside ami core.
+#
+# Record with:  vhs demos/inline.tape   (needs `vhs` + a running LM Studio, and
+# ami-inline.nvim checked out next to this repo). Set AMI_ENDPOINT etc. in your
+# shell first if LM Studio isn't on localhost.
 #
 # Opens the shared `store` demo file and completes a NEW function from a comment,
 # so the model gets the existing types (User, ErrNotFound, Get) as real context.
