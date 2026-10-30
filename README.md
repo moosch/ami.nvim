@@ -83,6 +83,14 @@ Chat advisor — discuss a problem, get advice-only feedback:
 
 ![chat advisor demo](demos/chat.gif)
 
+Conversation tree — branch and summarize history:
+
+![conversation tree demo](demos/tree.gif)
+
+Runtime model selector — swap chat/FIM models on the fly:
+
+![model selector demo](demos/model.gif)
+
 > These GIFs are rendered from [VHS](https://github.com/charmbracelet/vhs) tapes in
 > `demos/`. Regenerate them with `make demos` (needs `vhs` and a running LM Studio;
 > set `AMI_ENDPOINT` for a non-localhost server). Tune the `Sleep` lines in each
