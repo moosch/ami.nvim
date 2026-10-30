@@ -73,6 +73,21 @@ binary on first run when `go` is available.
 4. In insert mode, `<C-g>` requests an inline completion; `<Tab>` accepts it.
 5. `:checkhealth ami` if anything looks off.
 
+## Demos
+
+Inline, comment-driven completion — write a comment, trigger, accept:
+
+![inline completion demo](demos/inline.gif)
+
+Chat advisor — discuss a problem, get advice-only feedback:
+
+![chat advisor demo](demos/chat.gif)
+
+> These GIFs are rendered from [VHS](https://github.com/charmbracelet/vhs) tapes in
+> `demos/`. Regenerate them with `make demos` (needs `vhs` and a running LM Studio;
+> set `AMI_ENDPOINT` for a non-localhost server). Tune the `Sleep` lines in each
+> `.tape` to match your model's latency.
+
 ## Commands
 
 | Command | What it does |

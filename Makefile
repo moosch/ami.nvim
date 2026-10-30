@@ -1,4 +1,4 @@
-.PHONY: build run test tidy clean
+.PHONY: build run test tidy clean demos
 
 BIN := bin/amid
 
@@ -16,3 +16,10 @@ tidy:
 
 clean:
 	rm -rf bin
+
+# Render the README demo GIFs. Requires `vhs` (https://github.com/charmbracelet/vhs)
+# and a running LM Studio. Override the endpoint/models via env, e.g.:
+#   AMI_ENDPOINT=http://192.168.68.100:1234/v1 make demos
+demos:
+	vhs demos/inline.tape
+	vhs demos/chat.tape
