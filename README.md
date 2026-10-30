@@ -83,9 +83,13 @@ Chat advisor — discuss a problem, get advice-only feedback:
 
 ![chat advisor demo](demos/chat.gif)
 
-Conversation tree — branch and summarize history:
+Conversation tree — summarize history to shrink context:
 
 ![conversation tree demo](demos/tree.gif)
+
+Conversation tree — branch to explore an alternative:
+
+![conversation tree branching demo](demos/tree-branch.gif)
 
 Runtime model selector — swap chat/FIM models on the fly:
 
