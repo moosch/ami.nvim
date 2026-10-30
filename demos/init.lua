@@ -17,6 +17,8 @@ vim.o.swapfile = false
 
 local endpoint = os.getenv("AMI_ENDPOINT") or "http://localhost:1234/v1"
 require("ami").setup({
+  -- Dedicated port so the demo never reuses (or clashes with) a real ami daemon.
+  daemon_url = "http://127.0.0.1:8799",
   chat = { endpoint = endpoint, model = os.getenv("AMI_CHAT_MODEL") or "qwen3-coder" },
   inline = {
     endpoint = endpoint,

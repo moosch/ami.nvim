@@ -25,7 +25,7 @@ Type "printf 'package store\n\nfunc Get(id string) (*User, error) {\n\treturn db
 Enter
 Type "nvim -u demos/init.lua /tmp/ami_tree_demo.go"
 Enter
-Sleep 3s
+Sleep 5s
 Show
 Sleep 1s
 
@@ -36,14 +36,14 @@ Sleep 1200ms
 Type "What edge cases should Get handle?"
 Escape
 Enter
-Sleep 11s
+Sleep 18s
 
 # --- turn 2 (prompt stays open after sending) ---
 Type "i"
 Type "And how would you name the error variables?"
 Escape
 Enter
-Sleep 11s
+Sleep 18s
 
 # --- close the chat, open the tree ---
 Type "q"
@@ -59,4 +59,4 @@ Sleep 800ms
 Type "j"
 Sleep 600ms
 Type "s"
-Sleep 9s
+Sleep 13s

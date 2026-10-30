@@ -27,7 +27,7 @@ Type "printf 'package store\n\nfunc Get(id string) (*User, error) {\n\treturn db
 Enter
 Type "nvim -u demos/init.lua /tmp/ami_branch_demo.go"
 Enter
-Sleep 3s
+Sleep 5s
 Show
 Sleep 1s
 
@@ -38,14 +38,14 @@ Sleep 1200ms
 Type "In one sentence, what does Get do?"
 Escape
 Enter
-Sleep 8s
+Sleep 14s
 
 # --- turn 2 (prompt stays open) : history is now n1,n2,n3,n4 ---
 Type "i"
 Type "In one sentence, suggest a clearer name for it."
 Escape
 Enter
-Sleep 8s
+Sleep 14s
 
 # --- close chat, open the tree, focus it ---
 Type "q"
@@ -74,7 +74,7 @@ Sleep 1000ms
 Type "In one sentence, should Get cache results instead?"
 Escape
 Enter
-Sleep 8s
+Sleep 14s
 
 # --- reopen the tree to reveal the fork ---
 Type "q"

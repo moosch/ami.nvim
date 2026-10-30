@@ -23,7 +23,7 @@ Type "printf 'package store\n\nfunc Get(id string) (*User, error) {\n\treturn db
 Enter
 Type "nvim -u demos/init.lua /tmp/ami_chat_demo.go"
 Enter
-Sleep 3s
+Sleep 5s           # let the daemon start and become ready
 Show
 Sleep 1s
 
@@ -35,5 +35,5 @@ Type "What edge cases should Get handle, and how would you structure the errors?
 Escape
 Enter
 
-# --- wait for the streamed advice ---
-Sleep 12s
+# --- wait for the streamed advice (first token ~5s + streaming) ---
+Sleep 22s
