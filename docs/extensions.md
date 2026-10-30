@@ -11,7 +11,7 @@ its own repo:
 provides the `chat` capability and a model slot),
 [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) (inline/FIM
 completion — a model slot),
-[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
+[`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim)
 (proactive suggestions — events, commands, daemon calls, a model slot), and
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
 (a split-window chat UI — a full `chat_ui` provider). A tiny in-tree template
@@ -24,7 +24,7 @@ Pass specs — or module names to `require()` — to `setup()`:
 ```lua
 require("ami").setup({
   extensions = {
-    require("ami-custom-proactive"),   -- a spec table
+    require("ami-proactive"),   -- a spec table
     "my-org.ami-notes",                -- or a module name ami will require()
   },
   -- Skip a specific extension by name:

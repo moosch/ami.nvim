@@ -62,7 +62,7 @@ ami core is a runtime; install the feature extensions you want alongside it:
     "moosch/ami-chat.nvim",              -- chat advisor panel + history tree
     "moosch/ami-inline.nvim",            -- inline (FIM) completion
     -- "moosch/ami-chat-split.nvim",        -- optional: split-window chat UI
-    -- "moosch/ami-custom-proactive.nvim",  -- optional: proactive suggestions
+    -- "moosch/ami-proactive.nvim",  -- optional: proactive suggestions
   },
   config = function()
     require("ami").setup({
@@ -136,7 +136,7 @@ Core itself provides only a few commands; features add their own.
 | `:AmiNewSession [name]` | Start a fresh conversation | ami-chat |
 | `:AmiTree` | Conversation tree — branch/switch/summarize | ami-chat |
 | `:AmiComplete` / `:AmiInlineAuto` | Request a completion / toggle auto-trigger | ami-inline |
-| `:AmiProactive` / `:AmiNudge` | Toggle proactive / request a suggestion now | ami-custom-proactive |
+| `:AmiProactive` / `:AmiNudge` | Toggle proactive / request a suggestion now | ami-proactive |
 
 Inline keys (from `ami-inline`, configurable): `<C-g>` request, `<Tab>` accept
 (falls back to a real Tab when none shown), `<C-]>` dismiss. **Comment-driven
@@ -211,7 +211,7 @@ ami ships **no active extensions** itself. First-party ones, each in their own r
   panel + history tree; provides the `chat` capability and a `chat` model slot.
 - [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) — inline (FIM)
   completion; registers a `fim` model slot.
-- [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim) —
+- [`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim) —
   proactive suggestions; registers a `proactive` model slot.
 - [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) — a
   split-window chat UI (a `chat_ui` provider that replaces ami-chat's panel).

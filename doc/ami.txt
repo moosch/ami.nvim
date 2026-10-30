@@ -63,7 +63,7 @@ the managed daemon (unless `daemon.auto_start = false`). See
 
 Core provides the model/daemon/extension commands below. Feature commands come
 from extensions: ami-chat.nvim adds :AmiChat, :AmiAsk, :AmiNewSession, :AmiTree;
-ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-custom-proactive.nvim adds
+ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-proactive.nvim adds
 :AmiProactive, :AmiNudge. See |ami-extensions|.
 
                                                                  *:AmiModel*
@@ -78,7 +78,7 @@ ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-custom-proactive.nvim add
                                                             *:AmiExtensions*
 :AmiExtensions    List the loaded extensions. Extensions add their own commands
                   (e.g. ami-inline.nvim adds :AmiComplete / :AmiInlineAuto;
-                  ami-custom-proactive.nvim adds :AmiProactive / :AmiNudge). See
+                  ami-proactive.nvim adds :AmiProactive / :AmiNudge). See
                   |ami-extensions|.
 
                                                                 *:AmiDaemon*
@@ -137,7 +137,7 @@ to require(), in |ami.setup()|: >
 <
 ami ships no active extensions itself. First-party ones (each its own repo):
 ami-chat.nvim (chat panel + tree; provides the "chat" capability), ami-inline.nvim
-(inline/FIM completion), ami-custom-proactive.nvim (proactive suggestions),
+(inline/FIM completion), ami-proactive.nvim (proactive suggestions),
 ami-chat-split.nvim (a split-window "chat_ui" provider). `:AmiExtensions` lists
 what is loaded. Lifecycle events: setup, context_assembled, chat_turn_pre,
 chat_turn_post, buf_write.
