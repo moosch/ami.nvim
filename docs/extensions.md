@@ -7,12 +7,14 @@ or — more usefully — in its own Neovim plugin repo that returns a spec.
 
 ami core is a runtime; every feature is an extension. Reference extensions, each in
 its own repo:
-[`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) (the chat panel + tree —
+[`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) (the chat panel —
 provides the `chat` capability and a model slot),
+[`ami-history.nvim`](https://github.com/moosch/ami-history.nvim) (branching history
+tree — provides the `history` capability),
 [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) (inline/FIM
 completion — a model slot),
 [`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim)
-(proactive suggestions — events, commands, daemon calls, a model slot), and
+(proactive suggestions — events, commands, direct LLM calls, a model slot), and
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
 (a split-window chat UI — a full `chat_ui` provider). A tiny in-tree template
 lives at `lua/ami/extensions/example.lua`.
@@ -73,8 +75,8 @@ User config for an extension lives under its `name`
 | `api.provide(cap, impl)` | offer a provider for a named capability (see below) |
 | `api.resolve(cap)` | look up a capability provider (or nil) |
 | `api.chat` | proxies the `chat` capability (from a chat extension; no-ops if none): `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()` |
-| `api.client` | `stream(path, body, cbs)`, `post_json(path, body, cb, opts)` — talk to the daemon |
-| `api.context` | `gather_async(bufnr, win, selection, range, cb)`, `project_root(bufnr)` |
+| `api.client` | `stream_chat(endpoint, body, cbs)`, `complete(endpoint, body, cb, opts)`, `models_from(endpoint, cb)` — the OpenAI-compatible LM Studio client (direct, no daemon) |
+| `api.context` | `gather_async(bufnr, win, selection, range, cb)`, `assemble(refs, budget)`, `project_root(bufnr)`, `last_selection()` |
 | `api.models` | `register(slot)`, `default()`, `effective(name)` — the model registry (below) |
 
 ## Lifecycle events
@@ -82,19 +84,21 @@ User config for an extension lives under its `name`
 | Event | Payload | When |
 | --- | --- | --- |
 | `setup` | — | after `ami.setup()` finishes |
-| `context_assembled` | `(ctx, meta)` | context ready (chat **and** proactive); handlers may **mutate `ctx`** (add `dep_paths`, notes, …) |
-| `chat_turn_pre` | `(req)` | before a chat turn streams; handlers may **mutate `req`** (`{session_id, message, model, context}`) |
-| `chat_turn_post` | `(res)` | after a turn finishes/errors (`{ok, session_id, error?}`) |
+| `context_assembled` | `(ctx, meta)` | context ready; handlers may **mutate `ctx`** (add `dep_paths`, notes, …) |
+| `chat_session` | `{ session }` | a chat session is started/switched |
+| `chat_turn_pre` | `(req)` | before a chat turn streams; handlers may **mutate `req`** (`{model, messages, stream}`) |
+| `chat_turn_post` | `{ session, ok, user, assistant, error? }` | after a turn finishes/errors; carries the full user + assistant text (how a history provider records) |
 | `buf_write` | `(bufnr)` | a buffer was written (`BufWritePost`) |
 
 Handlers run in registration order, each under `pcall` — a throwing handler is
 logged and the rest still run.
 
-## Capability providers (swappable UI)
+## Capability providers
 
 `api.provide(cap, impl)` registers an implementation for a named capability;
-core or another extension looks it up with `require("ami.extensions").resolve(cap)`.
-This is how UI surfaces become swappable.
+look it up with `api.resolve(cap)`. Unlike events (broadcast, many listeners), a
+capability has **one** provider — the single source of truth for that surface. This
+is how the chat panel, its UI, and history become swappable.
 
 ### `chat` — the chat panel itself
 
@@ -104,6 +108,31 @@ Chat is an extension ([`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim)
 and more. Core's `api.chat` proxies to it, so other extensions (e.g. proactive)
 reach the panel without depending on ami-chat directly; the calls are safe no-ops if
 no chat extension is loaded.
+
+### `history` — conversation memory
+
+The chat controller consults the `history` provider for the **prior-turn messages**
+to include in each request, and broadcasts `chat_turn_post` (with the full user +
+assistant text) so the provider can record the turn. Register one to own
+conversation memory however you like (linear log, branching tree, a vector store …):
+
+```lua
+setup = function(api)
+  api.on("chat_turn_post", function(e)      -- record: e.session, e.user, e.assistant
+    if e.ok then store(e.session, e.user, e.assistant) end
+  end)
+  api.provide("history", {
+    -- prior turns for the next request, as { {role, content}, ... }
+    messages = function(session) return load(session) end,
+  })
+end
+```
+
+With no `history` provider installed, ami-chat keeps a minimal in-memory history for
+the current session (not persisted). The reference provider is
+[`ami-history.nvim`](https://github.com/moosch/ami-history.nvim) — a branching tree
+with persistence, summarization, and `:AmiTree` (it collapses a summarized prefix
+into one system message in `messages()`).
 
 ### `chat_ui` — replace the chat panel
 
@@ -179,7 +208,7 @@ your-ami-ext.nvim/
 ```
 
 Users install it with their plugin manager and add `require("your-ami-ext")` to
-`extensions`. Reach ami only through `api.*` (and, if needed, the daemon via
+`extensions`. Reach ami only through `api.*` (and the LM Studio provider via
 `api.client`) so you don't couple to internals. By convention, name the repo
 `ami-*.nvim`.
 
@@ -190,16 +219,16 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 Tracked here until done. PRs/ideas welcome.
 
 1. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
-   Doable via `chat_turn_pre` once the daemon accepts an optional `instructions`
-   field and merges it into the system prompt (`internal/prompt/system.go`).
+   Doable now via a `chat_turn_pre` handler that mutates `req.messages` (e.g.
+   appends a system message), or prepends to the chat system prompt.
 2. **Context-provider extensions** via `context_assembled`: git diff/blame,
    test/build output, LSP diagnostics, a project-conventions file.
-3. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
-   likely an out-of-process HTTP protocol for context/prompt middleware.
-4. **rtp auto-discovery** of installed extensions, and **project-local
+3. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
+4. **Fancier history** providers (semantic search / summarizing memory) against the
+   same `history` capability.
 
-**Done:** core is now a pure runtime — chat (`ami-chat.nvim`), inline
-(`ami-inline.nvim`), and proactive are all extensions; the `chat`/`chat_ui`
-capabilities (swappable panel), the model registry + generic selector, and the
-packaging convention (`ami-*.nvim` repos exposing a spec).
+**Done:** core is now a **pure-Lua runtime** (no daemon) — chat (`ami-chat.nvim`),
+history (`ami-history.nvim`), inline (`ami-inline.nvim`), and proactive are all
+extensions; the `chat`/`chat_ui`/`history` capabilities, the chat event pathway, the
+model registry + generic selector, and the `ami-*.nvim` packaging convention.

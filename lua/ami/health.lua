@@ -26,29 +26,7 @@ function M.check()
     h.error("curl not found on PATH (required for all requests)")
   end
 
-  if exe("go") then
-    h.ok("go found (daemon can be auto-built)")
-  else
-    h.warn("go not found; the daemon must be prebuilt (`make build`)")
-  end
-
-  local src = debug.getinfo(1, "S").source:sub(2)
-  local bin = vim.fn.fnamemodify(src, ":h:h:h") .. "/bin/amid"
-  if vim.fn.executable(bin) == 1 then
-    h.ok("amid binary present: " .. bin)
-  else
-    h.warn("amid not built yet (" .. bin .. ") — runs `make build` / auto-builds on start")
-  end
-
   local cfg = require("ami.config").options
-  local ok_d, body = sync_get(cfg.daemon_url .. "/health")
-  if ok_d then
-    local okj, data = pcall(vim.json.decode, body)
-    local ver = (okj and type(data) == "table" and data.version) or "?"
-    h.ok(("daemon responding at %s (version %s)"):format(cfg.daemon_url, ver))
-  else
-    h.info("daemon not running yet — it starts on setup()")
-  end
 
   -- Check each registered model slot's provider endpoint, de-duplicated.
   local models = require("ami.models")

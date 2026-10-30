@@ -6,16 +6,10 @@ on:
   pull_request:
 
 jobs:
-  go:
-    name: Go (daemon)
+  check:
+    name: Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check version consistency (server.go == README)
+      - name: Check version consistency (VERSION == README)
         run: scripts/check-version.sh
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26"
-      - run: go vet ./...
-      - run: go test ./...
-      - run: go build -o bin/amid ./cmd/amid

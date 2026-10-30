@@ -21,50 +21,55 @@ ami is a Neovim plugin pairing you with a local LLM (via LM Studio) that
 inline completions, and occasionally a proactive suggestion — but it never
 edits your files. You stay in control.
 
-It is a Lua plugin plus a small Go daemon (`amid`). The daemon holds the
-intelligence (context assembly, history, LLM proxying); Neovim is a thin client.
+It is a pure-Lua Neovim plugin. There is no daemon: ami talks to LM Studio
+directly over the OpenAI-compatible API (via curl). The core is a small runtime;
+every feature is an extension.
 
 ==============================================================================
 2. REQUIREMENTS                                           *ami-requirements*
 
   - Neovim >= 0.10 (uses |vim.system()|, |vim.uv|, |vim.fs.root()|)
-  - Go (to build the daemon; auto-built on first run if present)
   - curl on $PATH
   - LM Studio (or any OpenAI-compatible server) with a model loaded
-  - Linux (developed on macOS too). Windows is not supported.
+  - Linux and macOS. Windows is untested but no longer excluded.
 
 ==============================================================================
 3. INSTALLATION                                           *ami-installation*
 
-lazy.nvim: >
+Pure Lua — no build step. Install core plus the feature extensions you want. >
     {
       "moosch/ami.nvim",
-      build = "make build",       -- compiles the Go daemon
+      dependencies = {
+        "moosch/ami-chat.nvim",
+        "moosch/ami-history.nvim",
+        "moosch/ami-inline.nvim",
+      },
       config = function()
-        require("ami").setup({})
+        require("ami").setup({
+          extensions = {
+            require("ami-chat"), require("ami-history"), require("ami-inline"),
+          },
+        })
       end,
     }
 <
-The `build` step compiles `amid`. If omitted, the plugin auto-builds it on
-first run when `go` is available.
-
 ==============================================================================
 4. SETUP                                                         *ami-setup*
 
                                                               *ami.setup()*
 require("ami").setup({opts})
 
-Call once. Registers commands, the model registry, any extensions, and starts
-the managed daemon (unless `daemon.auto_start = false`). See
+Call once. Registers commands, the model registry, and any extensions. See
 |ami-configuration| for {opts}.
 
 ==============================================================================
 5. COMMANDS                                                   *ami-commands*
 
-Core provides the model/daemon/extension commands below. Feature commands come
-from extensions: ami-chat.nvim adds :AmiChat, :AmiAsk, :AmiNewSession, :AmiTree;
-ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-proactive.nvim adds
-:AmiProactive, :AmiNudge. See |ami-extensions|.
+Core provides the model/extension commands below. Feature commands come from
+extensions: ami-chat.nvim adds :AmiChat, :AmiAsk, :AmiNewSession;
+ami-history.nvim adds :AmiTree; ami-inline.nvim adds :AmiComplete,
+:AmiInlineAuto; ami-proactive.nvim adds :AmiProactive, :AmiNudge. See
+|ami-extensions|.
 
                                                                  *:AmiModel*
 :AmiModel [slot]
@@ -81,12 +86,8 @@ ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-proactive.nvim adds
                   ami-proactive.nvim adds :AmiProactive / :AmiNudge). See
                   |ami-extensions|.
 
-                                                                *:AmiDaemon*
-:AmiDaemon [start|stop|restart]
-                      Control the managed daemon (default restart).
-
                                                                 *:AmiHealth*
-:AmiHealth        Ping the daemon and report its status.
+:AmiHealth        Run :checkhealth ami (curl + provider reachability).
 
                                                                    *:AmiLog*
 :AmiLog           Open the log viewer. *:AmiDebug* toggles verbose logs.
@@ -96,28 +97,23 @@ ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-proactive.nvim adds
 
 Defaults (pass overrides to |ami.setup()|): >
     require("ami").setup({
-      daemon_url = "http://127.0.0.1:8787",
       model = {                     -- default model slot (every slot falls back here)
         endpoint = "http://localhost:1234/v1",
         model = "qwen3-coder",      -- pick per slot live with :AmiModel
       },
-      session_dir = nil,            -- nil = stdpath("data")/ami
-                                    --  ""  = each project's ./.ami/sessions
-      daemon = {
-        auto_start = true, auto_build = true, bin = nil,
-      },
       context = {
         lsp_deps = true, dep_max_files = 5,
         dep_timeout_ms = 1500, dep_max_positions = 30,
+        token_budget = 8000,        -- max tokens of assembled context per turn
       },
       extensions = {            -- feature extensions (their own repos)
-        require("ami-chat"), require("ami-inline"),
+        require("ami-chat"), require("ami-history"), require("ami-inline"),
       },
       disable_extensions = {},  -- names of extensions to skip
     })
 <
-Chat lives in ami-chat.nvim and inline in ami-inline.nvim; install them and add
-require("ami-chat") / require("ami-inline") to `extensions`. An extension's own
+Chat lives in ami-chat.nvim, history in ami-history.nvim, inline in
+ami-inline.nvim; install them and add them to `extensions`. An extension's own
 options live under its name (e.g. `chat = { ui = {...} }`, `inline = { ... }`).
 See |ami-extensions|.
 ==============================================================================
@@ -136,31 +132,32 @@ to require(), in |ami.setup()|: >
     })
 <
 ami ships no active extensions itself. First-party ones (each its own repo):
-ami-chat.nvim (chat panel + tree; provides the "chat" capability), ami-inline.nvim
+ami-chat.nvim (chat panel; provides the "chat" capability), ami-history.nvim
+(branching history tree; provides the "history" capability), ami-inline.nvim
 (inline/FIM completion), ami-proactive.nvim (proactive suggestions),
 ami-chat-split.nvim (a split-window "chat_ui" provider). `:AmiExtensions` lists
-what is loaded. Lifecycle events: setup, context_assembled, chat_turn_pre,
-chat_turn_post, buf_write.
+what is loaded. Lifecycle events: setup, context_assembled, chat_session,
+chat_turn_pre, chat_turn_post, buf_write.
 
-Full API, event reference, model registry, the chat/chat_ui contracts, and a guide
-to writing/publishing your own are in docs/extensions.md in the repository.
+Full API, event reference, model registry, the chat/chat_ui/history contracts, and
+a guide to writing/publishing your own are in docs/extensions.md in the repository.
 
 ==============================================================================
 8. HOW IT WORKS                                           *ami-architecture*
 
-  Neovim (Lua)  --HTTP+SSE-->  amid (Go)  --OpenAI API-->  LM Studio
+  Neovim (Lua)  --curl (HTTP + SSE)-->  LM Studio
 
-The daemon is reference-counted across Neovim instances: it is shared while any
-instance is attached and stopped only when the last one exits. Inline completion
-talks to LM Studio directly (not through the daemon) to keep latency low.
+ami talks to LM Studio directly — no daemon, no separate process, no build step.
+The chat extension assembles each request (system prompt + context + prior turns
+from the history provider + your message) and streams the reply from the model.
 
-Conversation history is a branching tree stored under `session_dir`
-(default stdpath("data")/ami/<project>/), kept out of your repositories.
+Conversation history is the ami-history.nvim extension (a branching tree persisted
+under stdpath("data")/ami/<project>/, out of your repositories).
 
 ==============================================================================
 9. HEALTH                                                       *ami-health*
 
-Run `:checkhealth ami` to verify Neovim version, curl, Go, the daemon
-binary, the daemon, and LM Studio reachability.
+Run `:checkhealth ami` to verify Neovim version, curl, and LM Studio (each model
+slot's provider endpoint) reachability.
 
 vim:tw=78:ts=8:ft=help:norl:

@@ -211,4 +211,107 @@ function M.gather_async(bufnr, winid, selection, range, cb)
   vim.defer_fn(finish, cctx.dep_timeout_ms or 1500)
 end
 
+-- Context assembly -----------------------------------------------------------
+-- Build the single context string sent with a chat turn, ordered by importance
+-- (selection > active buffer > LSP deps > README/PLAN) and trimmed to a token
+-- budget. Ported from the former Go daemon (internal/context/assemble.go).
+
+--- Rough token estimate (~4 chars/token); good enough for budgeting.
+---@param s string|nil
+---@return integer
+function M.estimate_tokens(s)
+  return math.floor(#(s or "") / 4)
+end
+
+local function read_file(path)
+  local fd = io.open(path, "r")
+  if not fd then
+    return nil
+  end
+  local data = fd:read("*a")
+  fd:close()
+  return data
+end
+
+-- Path relative to root, or the original path when it isn't under root.
+local function relpath(root, path)
+  if root and root ~= "" and path:sub(1, #root + 1) == root .. "/" then
+    return path:sub(#root + 2)
+  end
+  return path
+end
+
+local function display_path(refs)
+  if not refs.active_path or refs.active_path == "" then
+    return "(unsaved buffer)"
+  end
+  return relpath(refs.project_root, refs.active_path)
+end
+
+-- Concatenate sections into fenced blocks, trimming the last ones that overflow.
+local function render(sections, budget)
+  local parts, used = {}, 0
+  for _, s in ipairs(sections) do
+    local block = ("## %s\n\n```\n%s\n```\n\n"):format(s.title, s.body)
+    local cost = M.estimate_tokens(block)
+    if used + cost > budget and used > 0 then
+      parts[#parts + 1] = "_(further context omitted to stay within the token budget)_\n"
+      break
+    end
+    if cost > budget then -- a single section bigger than the whole budget
+      local max_chars = budget * 4
+      if max_chars < #block then
+        block = block:sub(1, max_chars) .. "\n…(truncated)…\n```\n\n"
+      end
+    end
+    parts[#parts + 1] = block
+    used = used + cost
+  end
+  return vim.trim(table.concat(parts))
+end
+
+--- Assemble the context block from refs, within `budget` tokens.
+---@param refs table from gather/gather_async
+---@param budget integer token budget
+---@return string
+function M.assemble(refs, budget)
+  refs = refs or {}
+  budget = budget or 8000
+  local sections = {}
+
+  local sel = vim.trim(refs.selection or "")
+  if sel ~= "" then
+    sections[#sections + 1] = {
+      title = ("Selection in %s (around line %d)"):format(display_path(refs), refs.cursor_line or 0),
+      body = sel,
+    }
+  end
+  local content = vim.trim(refs.active_content or "")
+  if content ~= "" then
+    sections[#sections + 1] = { title = "Active file: " .. display_path(refs), body = content }
+  end
+
+  local seen = { [refs.active_path or ""] = true }
+  for _, p in ipairs(refs.dep_paths or {}) do
+    if p ~= "" and not seen[p] then
+      seen[p] = true
+      local data = read_file(p)
+      if data then
+        sections[#sections + 1] = { title = "Dependency: " .. relpath(refs.project_root, p), body = data }
+      end
+    end
+  end
+
+  if refs.project_root and refs.project_root ~= "" then
+    for _, name in ipairs({ "README.md", "PLAN.md" }) do
+      local data = read_file(refs.project_root .. "/" .. name)
+      if data then
+        sections[#sections + 1] = { title = name, body = data }
+      end
+    end
+  end
+
+  return render(sections, budget)
+end
+
 return M

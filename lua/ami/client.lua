@@ -1,79 +1,20 @@
--- ami.client: talks to the amid daemon over HTTP, using the system
--- `curl` binary via vim.system. Streaming endpoints are consumed as SSE.
-local config = require("ami.config")
+-- ami.client: an OpenAI-compatible (LM Studio) HTTP client, using the system
+-- `curl` binary via vim.system. Chat streaming is consumed as SSE. There is no
+-- daemon any more — ami talks to the provider directly.
 local log = require("ami.log")
 
 local M = {}
 
-local function daemon_url()
-  return config.options.daemon_url
-end
-
---- GET /health. Calls cb(ok, data) on the main loop.
----@param cb fun(ok: boolean, data: table|string)
----@param opts table|nil { quiet = boolean } suppress the failure warning
-function M.health(cb, opts)
-  opts = opts or {}
-  local url = daemon_url() .. "/health"
-  log.debug("health: GET " .. url)
-  vim.system(
-    { "curl", "-sS", "-m", "5", url },
-    { text = true },
-    function(res)
-      vim.schedule(function()
-        if res.code ~= 0 then
-          local msg = ("health: curl exit %d — %s"):format(res.code, (res.stderr or ""):gsub("%s+$", ""))
-          if opts.quiet then
-            log.debug(msg)
-          else
-            log.warn(msg)
-          end
-          cb(false, "curl failed (code " .. res.code .. "): " .. (res.stderr or ""))
-          return
-        end
-        local ok, decoded = pcall(vim.json.decode, res.stdout)
-        if not ok then
-          log.warn("health: invalid JSON — " .. tostring(res.stdout))
-          cb(false, "invalid JSON from daemon: " .. tostring(res.stdout))
-          return
-        end
-        log.debug("health: ok " .. vim.inspect(decoded))
-        cb(true, decoded)
-      end)
-    end
-  )
-end
-
---- GET /models (LM Studio list via the daemon). cb(ok, { ids }, default).
----@param cb fun(ok: boolean, ids: string[]|string, default: string|nil)
-function M.models(cb)
-  vim.system(
-    { "curl", "-sS", "-m", "10", daemon_url() .. "/models" },
-    { text = true },
-    function(res)
-      vim.schedule(function()
-        if res.code ~= 0 then
-          cb(false, "curl exit " .. res.code .. ": " .. (res.stderr or ""))
-          return
-        end
-        local ok, data = pcall(vim.json.decode, res.stdout)
-        if not ok or type(data) ~= "table" then
-          cb(false, "bad JSON from daemon: " .. tostring(res.stdout))
-          return
-        end
-        cb(true, data.models or {}, data.default)
-      end)
-    end
-  )
+local function base(endpoint)
+  return (endpoint or ""):gsub("/+$", "")
 end
 
 --- GET <endpoint>/models directly from an OpenAI-compatible provider.
---- cb(ok, { ids }). Used by the model selector so chat and inline can list from
---- their own (possibly different) providers.
+--- cb(ok, { ids }). Used by the model selector.
 ---@param endpoint string base URL, e.g. "http://localhost:1234/v1"
 ---@param cb fun(ok: boolean, ids: string[]|string)
 function M.models_from(endpoint, cb)
-  local url = (endpoint or ""):gsub("/+$", "") .. "/models"
+  local url = base(endpoint) .. "/models"
   vim.system(
     { "curl", "-sS", "-m", "10", url },
     { text = true },
@@ -89,9 +30,9 @@ function M.models_from(endpoint, cb)
           return
         end
         local ids = {}
-        for _, m in ipairs(data.data) do
-          if m.id then
-            ids[#ids + 1] = m.id
+        for _, mdl in ipairs(data.data) do
+          if mdl.id then
+            ids[#ids + 1] = mdl.id
           end
         end
         cb(true, ids)
@@ -100,18 +41,110 @@ function M.models_from(endpoint, cb)
   )
 end
 
---- POST a JSON body and decode a single JSON response. cb(ok, data|errmsg).
----@param path string
----@param body table
----@param cb fun(ok: boolean, data: table|string)
+--- POST <endpoint>/chat/completions and stream the reply.
+---@param endpoint string provider base URL
+---@param body table { model, messages, temperature?, ... } (stream is forced on)
+---@param callbacks table { on_token=fun(content), on_done=fun(), on_error=fun(msg) }
+---@return vim.SystemObj handle (supports :kill())
+function M.stream_chat(endpoint, body, callbacks)
+  local on_token = callbacks.on_token or function() end
+  local on_done = callbacks.on_done or function() end
+  local on_error = callbacks.on_error or function() end
+
+  body.stream = true
+  local url = base(endpoint) .. "/chat/completions"
+  local payload = vim.json.encode(body)
+  log.info(("stream_chat: POST %s (%d bytes)"):format(url, #payload))
+
+  local pending = ""
+  local errored = false
+  local tokens = 0
+
+  -- Parse one SSE line (OpenAI format: `data: {json}` / `data: [DONE]`).
+  local function handle_line(line)
+    local data = line:gsub("\r$", ""):match("^data:%s?(.*)$")
+    if not data or data == "" then
+      return
+    end
+    if data == "[DONE]" then
+      return
+    end
+    local ok, obj = pcall(vim.json.decode, data)
+    if not ok or type(obj) ~= "table" then
+      return
+    end
+    if obj.error then
+      errored = true
+      local e = obj.error
+      on_error(type(e) == "table" and (e.message or vim.inspect(e)) or tostring(e))
+      return
+    end
+    local choice = obj.choices and obj.choices[1]
+    local content = choice and choice.delta and choice.delta.content
+    if content and content ~= "" then
+      tokens = tokens + 1
+      on_token(content)
+    end
+  end
+
+  return vim.system(
+    {
+      "curl", "-sS", "-N", "-X", "POST",
+      "-H", "Content-Type: application/json",
+      "-d", payload, url,
+    },
+    {
+      text = true,
+      stdout = function(err, chunk)
+        if err or not chunk then
+          return
+        end
+        vim.schedule(function()
+          pending = pending .. chunk
+          while true do
+            local nl = pending:find("\n", 1, true)
+            if not nl then
+              break
+            end
+            handle_line(pending:sub(1, nl - 1))
+            pending = pending:sub(nl + 1)
+          end
+        end)
+      end,
+    },
+    function(res)
+      vim.schedule(function()
+        if pending ~= "" then
+          handle_line(pending)
+          pending = ""
+        end
+        log.debug(("stream_chat: curl exit=%d, tokens=%d"):format(res.code, tokens))
+        if errored then
+          return -- on_error already fired
+        end
+        if res.code ~= 0 then
+          on_error(("curl exit %d: %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
+        else
+          on_done()
+        end
+      end)
+    end
+  )
+end
+
+--- POST <endpoint>/completions (non-streaming) and call cb(ok, text|errmsg).
+--- For FIM / raw completion callers.
+---@param endpoint string
+---@param body table { model, prompt, max_tokens, ... }
+---@param cb fun(ok: boolean, text: string)
 ---@param opts table|nil { timeout_s = number }
-function M.post_json(path, body, cb, opts)
+function M.complete(endpoint, body, cb, opts)
   opts = opts or {}
-  local url = daemon_url() .. path
-  log.debug("post: POST " .. url)
+  body.stream = false
+  local url = base(endpoint) .. "/completions"
   vim.system(
     {
-      "curl", "-sS", "-m", tostring(opts.timeout_s or 60),
+      "curl", "-sS", "-m", tostring(opts.timeout_s or 30),
       "-X", "POST", "-H", "Content-Type: application/json",
       "-d", vim.json.encode(body), url,
     },
@@ -123,123 +156,17 @@ function M.post_json(path, body, cb, opts)
           return
         end
         local ok, data = pcall(vim.json.decode, res.stdout)
-        if not ok then
-          cb(false, "bad JSON from daemon: " .. tostring(res.stdout))
+        if not ok or type(data) ~= "table" then
+          cb(false, "bad JSON from " .. url .. ": " .. tostring(res.stdout))
           return
         end
-        cb(true, data)
-      end)
-    end
-  )
-end
-
--- Parse any complete SSE event blocks from `buffer`, invoking `on_event` for
--- each. Returns the unparsed remainder (a partial trailing block).
-local function drain_events(buffer, on_event)
-  while true do
-    local sep = buffer:find("\n\n", 1, true)
-    if not sep then
-      return buffer
-    end
-    local block = buffer:sub(1, sep - 1)
-    buffer = buffer:sub(sep + 2)
-
-    local event, data = nil, nil
-    for line in (block .. "\n"):gmatch("(.-)\n") do
-      local ev = line:match("^event:%s?(.*)$")
-      local da = line:match("^data:%s?(.*)$")
-      if ev then
-        event = ev
-      elseif da then
-        data = da
-      end
-    end
-    if event then
-      local decoded = nil
-      if data and data ~= "" then
-        local ok, v = pcall(vim.json.decode, data)
-        decoded = ok and v or nil
-      end
-      on_event(event, decoded)
-    end
-  end
-end
-
---- POST a JSON body to `path` and consume the SSE response.
----@param path string e.g. "/chat"
----@param body table encoded as JSON request body
----@param callbacks table { on_token=fun(content), on_done=fun(), on_error=fun(msg) }
----@return vim.SystemObj handle (supports :kill() to cancel)
-function M.stream(path, body, callbacks)
-  local on_token = callbacks.on_token or function() end
-  local on_done = callbacks.on_done or function() end
-  local on_error = callbacks.on_error or function() end
-
-  local url = daemon_url() .. path
-  local payload = vim.json.encode(body)
-  log.info(("stream: POST %s (%d bytes)"):format(url, #payload))
-
-  local pending = ""
-  local counts = { token = 0, done = 0, error = 0, other = 0 }
-  local first_token_logged = false
-  local errored = false
-
-  local function handle_event(event, data)
-    if event == "token" then
-      counts.token = counts.token + 1
-      if not first_token_logged then
-        first_token_logged = true
-        log.debug("stream: first token received")
-      end
-      on_token(data and data.content or "")
-    elseif event == "done" then
-      counts.done = counts.done + 1
-      log.info(("stream: done (%d tokens)"):format(counts.token))
-      on_done()
-    elseif event == "error" then
-      counts.error = counts.error + 1
-      errored = true
-      local m = data and data.message or "unknown error"
-      log.error("stream: server error — " .. m)
-      on_error(m)
-    else
-      counts.other = counts.other + 1
-      log.debug("stream: unknown event '" .. tostring(event) .. "'")
-    end
-  end
-
-  return vim.system(
-    {
-      "curl", "-sS", "-N", "-X", "POST",
-      "-H", "Content-Type: application/json",
-      "-d", payload,
-      url,
-    },
-    {
-      text = true,
-      stdout = function(err, chunk)
-        if err then
-          log.debug("stream: stdout err " .. tostring(err))
+        if data.error then
+          local e = data.error
+          cb(false, type(e) == "table" and (e.message or vim.inspect(e)) or tostring(e))
           return
         end
-        if not chunk then
-          return -- end of stdout
-        end
-        vim.schedule(function()
-          pending = drain_events(pending .. chunk, handle_event)
-        end)
-      end,
-    },
-    function(res)
-      vim.schedule(function()
-        log.debug(("stream: curl exited code=%d, events token=%d done=%d error=%d other=%d")
-          :format(res.code, counts.token, counts.done, counts.error, counts.other))
-        if res.code ~= 0 then
-          on_error(("curl exit %d: %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
-        elseif counts.done == 0 and not errored then
-          -- Clean exit but no terminating event: surface it so the UI doesn't hang silently.
-          on_error("stream ended without a 'done' event (daemon reachable? model loaded?)")
-        end
+        local text = data.choices and data.choices[1] and data.choices[1].text
+        cb(true, text or "")
       end)
     end
   )

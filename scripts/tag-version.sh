@@ -11,13 +11,12 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-VERSION_FILE="internal/server/server.go"
+VERSION_FILE="VERSION"
 
-version="$(grep -Eo 'const Version = "[0-9]+\.[0-9]+\.[0-9]+"' "$VERSION_FILE" \
-  | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+version="$(tr -d '[:space:]' < "$VERSION_FILE" 2>/dev/null || true)"
 
-if [[ -z "$version" ]]; then
-  echo "error: could not find 'const Version = \"x.y.z\"' in $VERSION_FILE" >&2
+if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "error: $VERSION_FILE missing or not X.Y.Z (got '${version}')" >&2
   exit 1
 fi
 

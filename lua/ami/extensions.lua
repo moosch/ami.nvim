@@ -161,13 +161,16 @@ local function make_api(spec)
     end,
   }
 
-  -- Daemon access (same client core uses).
+  -- LM Studio / OpenAI-compatible client (ami talks to the provider directly).
   api.client = {
-    stream = function(...)
-      return require("ami.client").stream(...)
+    stream_chat = function(...)
+      return require("ami.client").stream_chat(...)
     end,
-    post_json = function(...)
-      return require("ami.client").post_json(...)
+    complete = function(...)
+      return require("ami.client").complete(...)
+    end,
+    models_from = function(...)
+      return require("ami.client").models_from(...)
     end,
   }
 
@@ -181,6 +184,12 @@ local function make_api(spec)
     end,
     last_selection = function(...)
       return require("ami.context").last_selection(...)
+    end,
+    assemble = function(...)
+      return require("ami.context").assemble(...)
+    end,
+    estimate_tokens = function(...)
+      return require("ami.context").estimate_tokens(...)
     end,
   }
 

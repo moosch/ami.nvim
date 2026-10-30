@@ -2,9 +2,9 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.10.0).** It works and is covered by tests,
-> but it hasn't been battle-tested in day-to-day interactive use — expect sharp
-> edges, and pin a commit if you depend on it. Feedback and issues welcome.
+> ⚠️ **Status: early / experimental (v0.11.0).** It works day to day but hasn't been
+> widely battle-tested — expect sharp edges, and pin a commit if you depend on it.
+> Feedback and issues welcome.
 
 An IDE-resident AI pair programmer for Neovim — **advisor, not actor**. It
 discusses problems, surfaces trade-offs, completes code inline, and offers the
@@ -12,9 +12,9 @@ occasional proactive suggestion, but it **never edits your files**. Built to kee
 you in control and in practice, backed entirely by local models via
 [LM Studio](https://lmstudio.ai/).
 
-It's a Lua plugin plus a small Go daemon (`amid`). The daemon holds the
-intelligence (context assembly, history, LLM proxying, streaming); Neovim stays a
-thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic.
+It's **pure Lua** — no daemon, no build step. ami talks to LM Studio directly over
+the OpenAI-compatible API (via `curl`), so it's model-agnostic. The core is a small
+runtime; every feature is an extension.
 
 ## Features
 
@@ -28,25 +28,23 @@ thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic
 - **Inline completion** — native Copilot-style FIM ghost text, manual by default
   (or debounced auto). Accept/dismiss; nothing is written until you accept. Ships
   as the [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) extension.
-- **A small runtime core** with a lifecycle + capability + model-registry API, so
-  every feature is a self-contained extension (in your config or its own repo).
-  Core is just the daemon, context engine, model registry, and extension system;
-  chat, inline, and proactive suggestions are first-party extensions.
+- **A small pure-Lua runtime core** with a lifecycle + capability + model-registry
+  API, so every feature is a self-contained extension (in your config or its own
+  repo). Core is just the LLM client, context engine, model registry, event bus, and
+  extension system; chat, inline, and proactive suggestions are first-party
+  extensions. History (the branching tree) is its own extension too.
 - **Runtime model registry** — a default model every feature inherits; each feature
   is a *slot* you can point at any model LM Studio has loaded, via `:AmiModel`.
-- **Managed daemon** — started/stopped with Neovim, reference-counted so it's
-  shared across instances and stops only when the last one exits.
 
 ## Requirements
 
 - Neovim ≥ 0.10 (`vim.system`, `vim.uv`, `vim.fs.root`)
-- Go (to build the daemon; auto-built on first run if present)
 - `curl` on `PATH`
 - [LM Studio](https://lmstudio.ai/) (or any OpenAI-compatible server) with a
   model loaded — a FIM-capable code model (Qwen Coder, DeepSeek-Coder,
   StarCoder2, CodeLlama) is recommended for inline completion
-- **Linux** (developed on macOS too; **Windows is not supported** — the daemon is
-  launched via `sh` and everything shells out to `curl`)
+- Linux and macOS. Windows is untested but no longer architecturally excluded
+  (pure Lua + `curl`); reports welcome.
 
 ## Installation
 
@@ -56,20 +54,21 @@ ami core is a runtime; install the feature extensions you want alongside it:
 
 ```lua
 {
-  "moosch/ami.nvim",
-  build = "make build",        -- compiles the Go daemon (amid)
+  "moosch/ami.nvim",            -- pure Lua, no build step
   dependencies = {
-    "moosch/ami-chat.nvim",              -- chat advisor panel + history tree
+    "moosch/ami-chat.nvim",              -- chat advisor panel
+    "moosch/ami-history.nvim",           -- branching history tree (multi-turn + :AmiTree)
     "moosch/ami-inline.nvim",            -- inline (FIM) completion
     -- "moosch/ami-chat-split.nvim",        -- optional: split-window chat UI
-    -- "moosch/ami-proactive.nvim",  -- optional: proactive suggestions
+    -- "moosch/ami-proactive.nvim",         -- optional: proactive suggestions
   },
   config = function()
     require("ami").setup({
-      -- point the daemon at your LM Studio if it isn't on localhost:
+      -- point ami at your LM Studio if it isn't on localhost:
       -- model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
       extensions = {
         require("ami-chat"),
+        require("ami-history"),
         require("ami-inline"),
       },
     })
@@ -77,15 +76,14 @@ ami core is a runtime; install the feature extensions you want alongside it:
 }
 ```
 
-The `build` step compiles `amid`. If you skip it, the plugin auto-builds the
-binary on first run when `go` is available. Without any feature extensions, core
-alone just manages the daemon and model registry — install `ami-chat.nvim` for the
-chat panel.
+No build step — ami is pure Lua. Without any feature extensions, core alone is just
+the model registry + runtime; install `ami-chat.nvim` for the chat panel and
+`ami-history.nvim` for persistent, branchable multi-turn history.
 
 ## Quick start
 
 1. Start LM Studio and load a model (defaults assume `http://localhost:1234/v1`).
-2. Open a project in Neovim — `amid` starts automatically.
+2. Open a project in Neovim.
 3. `:AmiChat`, type a question, `<Esc>` then `<Enter>` to send.
 4. In insert mode, `<C-g>` requests an inline completion; `<Tab>` accepts it.
 5. `:checkhealth ami` if anything looks off.
@@ -129,12 +127,11 @@ Core itself provides only a few commands; features add their own.
 | `:AmiModel [slot]` | Pick a model for a registered slot (no arg = choose which) | core |
 | `:AmiModels` | Show each model slot's current model | core |
 | `:AmiExtensions` | List the loaded extensions | core |
-| `:AmiDaemon [start\|stop\|restart]` | Control the managed daemon | core |
-| `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Status / log viewer / verbose logging | core |
+| `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Health check / log viewer / verbose logging | core |
 | `:AmiChat` | Toggle the chat panel (`<CR>` normal = send, `<C-n>` new, `q`/`<Esc>` hide) | ami-chat |
 | `:AmiAsk {text}` | One-shot question; visual mode sends the selection + its deps | ami-chat |
 | `:AmiNewSession [name]` | Start a fresh conversation | ami-chat |
-| `:AmiTree` | Conversation tree — branch/switch/summarize | ami-chat |
+| `:AmiTree` | Conversation tree — branch/switch/summarize | ami-history |
 | `:AmiComplete` / `:AmiInlineAuto` | Request a completion / toggle auto-trigger | ami-inline |
 | `:AmiProactive` / `:AmiNudge` | Toggle proactive / request a suggestion now | ami-proactive |
 
@@ -150,18 +147,17 @@ Defaults shown; pass overrides to `setup()`:
 
 ```lua
 require("ami").setup({
-  daemon_url = "http://127.0.0.1:8787",
   -- Default model slot: the base OpenAI-compatible provider + model that every
-  -- model slot (chat, and any extension's) falls back to. Pick per slot live
-  -- with :AmiModel.
+  -- model slot (chat, and any extension's) falls back to. ami talks to this
+  -- provider directly. Pick per slot live with :AmiModel.
   model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
-  session_dir = nil,               -- nil = stdpath("data")/ami (out of your repos)
-                                   --  "" = each project's ./.ami/sessions
-  daemon = { auto_start = true, auto_build = true, bin = nil },
-  context = { lsp_deps = true, dep_max_files = 5, dep_timeout_ms = 1500, dep_max_positions = 30 },
+  context = {
+    lsp_deps = true, dep_max_files = 5, dep_timeout_ms = 1500, dep_max_positions = 30,
+    token_budget = 8000,           -- max tokens of assembled context sent per turn
+  },
   -- Features live in extensions (their own repos); each registers its own config,
   -- commands, and model slot. Their options go under their own key, e.g.:
-  extensions = { require("ami-chat"), require("ami-inline") },
+  extensions = { require("ami-chat"), require("ami-history"), require("ami-inline") },
   -- chat   = { ui = { position = "right", opacity = 0.8, ... } },  -- ami-chat
   -- inline = { auto = true, model = "deepseek-coder-6.7b-instruct" }, -- ami-inline
 })
@@ -174,18 +170,14 @@ extensions load) and lets you pick a model for one from that slot's provider;
 `:AmiModels` shows the current picks. An extension's own options live under its key
 (e.g. `chat = { ui = ... }`, `inline = { ... }`) — see each extension's README.
 
-The daemon also reads these environment variables (the plugin sets them from the
-config above — `AMI_LMSTUDIO_URL`/`AMI_CHAT_MODEL` come from the effective chat
-model): `AMI_ADDR`, `AMI_LMSTUDIO_URL`, `AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`,
-`AMI_DATA_DIR`.
-
 ## Where history is stored
 
-Conversation history is a branching tree saved under `session_dir`, which
-defaults to `stdpath("data")/ami/<project>/sessions/` — **outside your
-repositories**, so nothing leaks into your working tree. Set `session_dir = ""`
-to instead keep it in each project's own `.ami/sessions/` (add `.ami/` to
-your global gitignore if you do).
+Conversation history (the branching tree + multi-turn context) is the
+[`ami-history.nvim`](https://github.com/moosch/ami-history.nvim) extension — install
+it to get persistent, branchable history and `:AmiTree`. It saves under
+`stdpath("data")/ami/<project>/sessions/` by default, **outside your repositories**;
+see its README for options. Without it, chat still works but history is in-memory
+for the current session only.
 
 ## Extensions
 
@@ -208,7 +200,10 @@ require("ami").setup({
 ami ships **no active extensions** itself. First-party ones, each in their own repo:
 
 - [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) — the chat advisor
-  panel + history tree; provides the `chat` capability and a `chat` model slot.
+  panel; provides the `chat` capability and a `chat` model slot.
+- [`ami-history.nvim`](https://github.com/moosch/ami-history.nvim) — the branching
+  history tree + persistence + `:AmiTree`; provides the `history` capability
+  (prior-turn context) by listening to the chat events.
 - [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) — inline (FIM)
   completion; registers a `fim` model slot.
 - [`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim) —
@@ -224,26 +219,27 @@ registry, the `chat`/`chat_ui` contracts, and the roadmap.
 ## How it works
 
 ```
-Neovim (Lua)  ──HTTP+SSE──▶  amid (Go)  ──OpenAI-compatible──▶  LM Studio
- chat UI, inline,             context, history,                     local models
- events, context  ◀────────  tree, LLM proxy  ◀──────────────────
+Neovim (Lua) ──curl (HTTP + SSE)──▶ LM Studio
+  ami core: LLM client, context assembly, model registry, event bus, extensions
+  extensions: chat (builds the request + streams), history, inline, proactive
 ```
 
-Inline completion talks to LM Studio **directly** (not through the daemon) to
-keep latency low. The daemon is reference-counted across Neovim instances via a
-registry under `stdpath("state")/ami/`, so one `amid` is shared and only
-stopped when the last instance exits.
+ami talks to LM Studio **directly** over the OpenAI-compatible API — no daemon, no
+separate process, no build step. The chat extension assembles each request (system
+prompt + context + prior turns from the history provider + your message) and streams
+the reply straight from the model.
 
 ## Development
 
+Pure Lua — nothing to build.
+
 ```sh
-make build   # build bin/amid
-make test    # go test ./...
-make run     # run the daemon in the foreground
+make check   # verify VERSION == README badge
+make demos   # render the README demo GIFs (needs vhs + LM Studio)
 ```
 
-The Go daemon lives in `cmd/amid` + `internal/`; the plugin in `lua/ami`.
-CI runs `go vet` / `go test` / `go build`.
+The plugin lives in `lua/ami` (core runtime) plus the first-party extension repos.
+CI runs the version check.
 
 ## License
 
