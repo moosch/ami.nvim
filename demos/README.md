@@ -32,6 +32,11 @@ make demos
 `make demos` renders every tape, then (if `gifsicle` is installed) optimizes the
 GIFs in place. To render a single one: `vhs demos/inline.tape`.
 
+`chat.tape` defaults its chat model to **`deepseek-coder`** (fast replies that
+keep the GIF short); set `AMI_CHAT_MODEL` to override. It shows the advisor panel
+in its default look — right-docked and semi-transparent, so the source file stays
+visible behind it.
+
 Then commit the output:
 
 ```sh
