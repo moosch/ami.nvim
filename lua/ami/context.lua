@@ -12,6 +12,20 @@ local M = {}
 
 local ROOT_MARKERS = { ".git", "PLAN.md", "README.md", "go.mod" }
 
+-- True if some LSP client attached to `bufnr` can answer textDocument/definition.
+-- Checking the capability up front avoids Neovim's "method ... is not supported
+-- by any of the servers" error when the only attached server (e.g. a markdown
+-- LSP on a PLAN.md) has no definitionProvider.
+local function any_client_supports_definition(bufnr)
+  for _, c in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+    local caps = c.server_capabilities
+    if caps and caps.definitionProvider then
+      return true
+    end
+  end
+  return false
+end
+
 --- Best-effort project root for the given buffer.
 ---@param bufnr integer|nil
 ---@return string
@@ -116,7 +130,7 @@ function M.gather_async(bufnr, winid, selection, range, cb)
   local refs = base_refs(bufnr, winid, selection)
 
   local cctx = config.options.context or {}
-  if cctx.lsp_deps == false or #vim.lsp.get_clients({ bufnr = bufnr }) == 0 then
+  if cctx.lsp_deps == false or not any_client_supports_definition(bufnr) then
     return cb(refs)
   end
 
