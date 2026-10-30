@@ -38,6 +38,9 @@ Then commit the output:
 git add demos/*.gif && git commit -m "docs: update demo gifs"
 ```
 
+> `tree.tape` and `tree-branch.tape` are kept here but are **not** part of
+> `make demos` or the main README yet — they need more timing/navigation work.
+
 ## Tuning
 
 These scripts are timing-based, so adjust them to your model's latency:

@@ -24,8 +24,6 @@ clean:
 demos: build
 	vhs demos/inline.tape
 	vhs demos/chat.tape
-	vhs demos/tree.tape
-	vhs demos/tree-branch.tape
 	vhs demos/model.tape
 	@$(MAKE) optimize-demos
 
