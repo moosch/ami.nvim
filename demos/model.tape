@@ -18,8 +18,11 @@ Set Framerate 24
 Set TypingSpeed 60ms
 Set Theme "Catppuccin Mocha"
 
-# --- setup (hidden) ---
+# --- setup (hidden): write the shared source file and open it as a backdrop ---
+# \042 is printf's octal for a double quote; %% prints a literal %.
 Hide
+Type "printf 'package store\n\nimport (\n\t\042context\042\n\t\042database/sql\042\n\t\042errors\042\n\t\042fmt\042\n)\n\nvar ErrNotFound = errors.New(\042store: user not found\042)\n\n// Get loads one user by id, returning ErrNotFound when the row is absent.\nfunc Get(ctx context.Context, db *sql.DB, id string) (*User, error) {\n\trow := db.QueryRowContext(ctx, \042SELECT id, name, email FROM users WHERE id = $1\042, id)\n\tvar u User\n\tif err := row.Scan(&u.ID, &u.Name, &u.Email); err != nil {\n\t\treturn nil, fmt.Errorf(\042store.Get(%%q): %%w\042, id, err)\n\t}\n\treturn &u, nil\n}\n' > /tmp/ami_model_demo.go"
+Enter
 Type "nvim -u demos/init.lua /tmp/ami_model_demo.go"
 Enter
 Sleep 3s
