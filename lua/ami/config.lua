@@ -7,21 +7,9 @@ local M = {}
 ---@field dep_timeout_ms integer Max time to wait for LSP before sending (default 1500).
 ---@field dep_max_positions integer Max symbol positions to query per turn (default 30).
 
----@class AmiInlineConfig
----@field enabled boolean Set up inline completion keymaps/autocmds (default true).
----@field endpoint string LM Studio OpenAI-compatible base URL (inline talks to it directly).
----@field model string FIM model name.
----@field auto boolean Auto-trigger (debounced) while typing (default false = manual).
----@field debounce_ms integer Auto-trigger debounce.
----@field max_tokens integer Max completion tokens requested.
----@field max_lines integer Truncate a suggestion to this many lines (0 = unlimited).
----@field temperature number Sampling temperature.
----@field context_before_lines integer Lines of prefix context.
----@field context_after_lines integer Lines of suffix context.
----@field timeout_ms integer Request timeout.
----@field fim table FIM tokens { prefix, suffix, middle }.
----@field stop string[] Stop sequences.
----@field keymaps table { trigger, accept, dismiss } insert-mode keys.
+---@class AmiModelConfig
+---@field endpoint string Default provider base URL (OpenAI-compatible).
+---@field model string Default model name — the fallback every model slot uses.
 
 ---@class AmiChatUIConfig
 ---@field position string "right" | "left" | "center" — where the panel sits.
@@ -32,24 +20,31 @@ local M = {}
 ---@field margin integer Gap in columns from the screen edge (for right/left).
 
 ---@class AmiChatConfig
----@field endpoint string OpenAI-compatible base URL for the chat/advisor provider.
----@field model string Chat model name (change live with :AmiModel).
+---@field endpoint string|nil Override the default provider for chat (nil = use `model`).
+---@field model string|nil Override the default chat model (nil = use `model`; change live with :AmiModel).
 ---@field ui AmiChatUIConfig
 
 ---@class AmiConfig
 ---@field daemon_url string Base URL of the amid daemon.
+---@field model AmiModelConfig The default model slot every slot falls back to.
 ---@field chat AmiChatConfig
 ---@field context AmiContextConfig
----@field inline AmiInlineConfig
 ---@field extensions (table|string)[] Extension specs, or module names to require().
 ---@field disable_extensions string[] Names of extensions to skip registering.
 M.defaults = {
   daemon_url = "http://127.0.0.1:8787",
-  -- The chat/advisor provider. Chat requests go through the amid daemon to this
-  -- endpoint. It can be a different provider/model from inline completion below.
-  chat = {
+  -- The default model slot: the base OpenAI-compatible provider + model that every
+  -- model slot (chat, and any extension's slot) falls back to. Pick models live
+  -- per slot with :AmiModel.
+  model = {
     endpoint = "http://localhost:1234/v1",
-    model = "qwen3-coder", -- change live with :AmiModel
+    model = "qwen3-coder",
+  },
+  -- The chat/advisor provider. Omit endpoint/model to inherit the default `model`
+  -- slot above; set them to point chat at a different provider/model.
+  chat = {
+    -- endpoint = nil,  -- inherit model.endpoint
+    -- model = nil,     -- inherit model.model
     ui = {
       position = "right",   -- "right" | "left" | "center"
       width = 0.4,          -- fraction of columns (<=1) or absolute columns (>1)
@@ -81,32 +76,8 @@ M.defaults = {
   extensions = {},
   -- Names of extensions to skip registering (e.g. a built-in you don't want).
   disable_extensions = {},
-  inline = {
-    enabled = true,
-    endpoint = "http://localhost:1234/v1",
-    model = "qwen3-coder",
-    prewarm = true,   -- fire one tiny request on setup to load the model early
-    auto = false,
-    debounce_ms = 400,
-    max_tokens = 256,   -- enough for a whole function from a comment
-    max_lines = 0,      -- 0 = no line cap; max_tokens bounds length (set >0 to trim)
-    temperature = 0.2,
-    context_before_lines = 120,
-    context_after_lines = 60,
-    timeout_ms = 20000,
-    fim = {
-      prefix = "<|fim_prefix|>",
-      suffix = "<|fim_suffix|>",
-      middle = "<|fim_middle|>",
-    },
-    stop = { "<|fim_pad|>", "<|endoftext|>", "<|file_sep|>", "<|repo_name|>",
-      "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>" },
-    keymaps = {
-      trigger = "<C-g>",
-      accept = "<Tab>",
-      dismiss = "<C-]>",
-    },
-  },
+  -- Inline completion moved to its own repo, ami-inline.nvim. Install it and add
+  -- require("ami-inline") to `extensions`; its options live under `inline` here.
 }
 
 ---@type AmiConfig

@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.6.0).** It works and is covered by tests,
+> ⚠️ **Status: early / experimental (v0.7.0).** It works and is covered by tests,
 > but it hasn't been battle-tested in day-to-day interactive use — expect sharp
 > edges, and pin a commit if you depend on it. Feedback and issues welcome.
 
@@ -22,16 +22,18 @@ thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic
   and get streamed, advice-only feedback grounded in your open file, selection,
   `README.md`/`PLAN.md`, and — via LSP — the files your code depends on.
 - **Inline completion** — native Copilot-style FIM ghost text, manual by default
-  (or debounced auto). Accept/dismiss; nothing is written until you accept.
+  (or debounced auto). Accept/dismiss; nothing is written until you accept. Ships
+  as the [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) extension.
 - **Branching history tree** — every message is a node; branch from any point and
   switch between branches. Summarize an old branch to shrink context
   non-destructively.
-- **Extensions** — a small core with a lifecycle hook + capability API, so optional
-  features live as self-contained extensions (in your config or their own repo).
-  Proactive suggestions ship as the reference extension,
-  [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim).
-- **Runtime model selector** — pick the chat and FIM models live from whatever
-  LM Studio has loaded.
+- **Extensions** — a small core with a lifecycle + capability + model-registry API,
+  so optional features live as self-contained extensions (in your config or their
+  own repo). Inline completion and proactive suggestions are the reference ones
+  ([`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim),
+  [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)).
+- **Runtime model registry** — a default model every feature inherits; each feature
+  is a *slot* you can point at any model LM Studio has loaded, via `:AmiModel`.
 - **Managed daemon** — started/stopped with Neovim, reference-counted so it's
   shared across instances and stops only when the last one exits.
 
@@ -54,11 +56,15 @@ With [lazy.nvim](https://github.com/folke/lazy.nvim):
 {
   "moosch/ami.nvim",
   build = "make build",        -- compiles the Go daemon (amid)
+  dependencies = {
+    "moosch/ami-inline.nvim",          -- inline (FIM) completion (optional)
+    -- "moosch/ami-custom-proactive.nvim", -- proactive suggestions (optional)
+  },
   config = function()
     require("ami").setup({
-      -- point inline/daemon at your LM Studio if it isn't on localhost:
-      -- chat   = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
-      -- inline = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
+      -- point the daemon at your LM Studio if it isn't on localhost:
+      -- model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
+      extensions = { require("ami-inline") },
     })
   end,
 }
@@ -102,20 +108,18 @@ Runtime model selector — swap chat/FIM models on the fly:
 | `:AmiAsk {text}` | One-shot question; visual mode sends the selection + its deps |
 | `:AmiNewSession [name]` | Start a fresh conversation |
 | `:AmiTree` | Conversation tree — branch/switch/summarize |
-| `:AmiComplete` | Request an inline completion |
-| `:AmiInlineAuto` | Toggle inline auto-trigger |
-| `:AmiModel [chat\|fim]` | Select the chat/FIM model at runtime |
-| `:AmiModels` | Show current model selections |
+| `:AmiModel [slot]` | Pick a model for a registered slot (no arg = choose which) |
+| `:AmiModels` | Show each model slot's current model |
 | `:AmiExtensions` | List the loaded extensions |
 | `:AmiDaemon [start\|stop\|restart]` | Control the managed daemon |
 | `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Status / log viewer / verbose logging |
 
-Extensions may add their own commands — e.g.
+Extensions add their own commands — e.g.
+[`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) adds `:AmiComplete`
+and `:AmiInlineAuto` (insert-mode keys, configurable: `<C-g>` request, `<Tab>`
+accept, `<C-]>` dismiss), and
 [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
 adds `:AmiProactive` and `:AmiNudge`.
-
-Default inline insert-mode keys (configurable): `<C-g>` request, `<Tab>` accept
-(falls back to a real Tab when none shown), `<C-]>` dismiss.
 
 **Comment-driven completion** works like the original Copilot: write a comment
 describing what you want, put the cursor on the line below it, and press `<C-g>` —
@@ -131,11 +135,15 @@ Defaults shown; pass overrides to `setup()`:
 ```lua
 require("ami").setup({
   daemon_url = "http://127.0.0.1:8787",
-  -- Chat/advisor provider (used via the daemon). Can be a different
-  -- provider/model from inline completion below.
+  -- Default model slot: the base OpenAI-compatible provider + model that every
+  -- model slot (chat, and any extension's) falls back to. Pick per slot live
+  -- with :AmiModel.
+  model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
+  -- Chat/advisor provider. Omit endpoint/model to inherit the default `model`
+  -- slot above; set them to point chat at a different provider/model.
   chat = {
-    endpoint = "http://localhost:1234/v1",
-    model = "qwen3-coder",         -- change live with :AmiModel
+    -- endpoint = "http://localhost:1234/v1",
+    -- model = "qwen3-coder",
     ui = {
       position = "right",          -- "right" | "left" | "center"
       width = 0.4,                 -- fraction of columns (<=1) or absolute cols (>1)
@@ -148,46 +156,25 @@ require("ami").setup({
                                    --  "" = each project's ./.ami/sessions
   daemon = { auto_start = true, auto_build = true, bin = nil },
   context = { lsp_deps = true, dep_max_files = 5, dep_timeout_ms = 1500, dep_max_positions = 30 },
-  inline = {
-    enabled = true,
-    endpoint = "http://localhost:1234/v1",   -- inline talks here directly (low latency)
-    model = "qwen3-coder",
-    prewarm = true,                -- load the model on setup so the first completion is fast
-    auto = false, debounce_ms = 400,
-    max_tokens = 256, max_lines = 0, temperature = 0.2,  -- max_lines 0 = no cap
-    context_before_lines = 120, context_after_lines = 60,
-    fim = { prefix = "<|fim_prefix|>", suffix = "<|fim_suffix|>", middle = "<|fim_middle|>" },
-    keymaps = { trigger = "<C-g>", accept = "<Tab>", dismiss = "<C-]>" },
-  },
-  proactive = {
-    enabled = false, on_idle = true, idle_ms = 20000,
-    on_save = true, min_interval_s = 180, require_normal_mode = true, notify = true,
+  -- Optional capabilities live in extensions (their own repos); each registers its
+  -- own config, commands, and model slot. See the Extensions section.
+  extensions = {
+    -- require("ami-inline"),           -- inline (FIM) completion
+    -- require("ami-custom-proactive"), -- proactive suggestions
   },
 })
 ```
 
-**Chat and inline are independent providers.** `chat.endpoint`/`chat.model` back
-the advisor (through the daemon); `inline.endpoint`/`inline.model` back completion
-(direct). Point them at the same LM Studio, or at two different
-providers/models entirely.
-
-The FIM tokens default to Qwen's format; set `inline.fim`/`inline.stop` to match
-a different model family. For snappy as-you-type completion, a smaller FIM model
-(e.g. `deepseek-coder-6.7b-instruct`) is much faster than a 30B chat model, at the
-cost of a second model resident in VRAM. `inline.prewarm` loads the FIM model on
-setup so your first completion doesn't pay the cold-start cost.
-
-**Inline not appearing?** First, make sure `inline.endpoint` points at your LM
-Studio (it defaults to `http://localhost:1234/v1`, so set it if LM Studio runs
-elsewhere). Turn on `:AmiDebug`, press `<C-g>`, and check `:AmiLog` — inline now
-reports the exact cause (connection refused, timeout, server error). The **first**
-completion is often a timeout while LM Studio loads the model into VRAM; it works
-once the model is warm. Raise `inline.timeout_ms` or use a smaller FIM model if
-cold loads routinely exceed the limit.
+**Models are a registry.** Core owns the default `model` slot; chat — and any
+extension that uses a model — is a *slot* that either overrides it or inherits it.
+`:AmiModel` lists every registered slot (`default`, `chat`, plus e.g. `fim` once
+`ami-inline` is installed, `proactive` with `ami-custom-proactive`) and lets you
+pick a model for one from that slot's provider; `:AmiModels` shows the current
+picks. An extension's options live under its own key (e.g. `inline = { ... }`).
 
 The daemon also reads these environment variables (the plugin sets them from the
-config above — `AMI_LMSTUDIO_URL`/`AMI_CHAT_MODEL` come from `chat`):
-`AMI_ADDR`, `AMI_LMSTUDIO_URL`, `AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`,
+config above — `AMI_LMSTUDIO_URL`/`AMI_CHAT_MODEL` come from the effective chat
+model): `AMI_ADDR`, `AMI_LMSTUDIO_URL`, `AMI_CHAT_MODEL`, `AMI_CONTEXT_BUDGET`,
 `AMI_DATA_DIR`.
 
 ## Where history is stored
@@ -202,29 +189,33 @@ your global gitignore if you do).
 
 ami keeps a small core and moves optional features into **extensions** —
 self-contained Lua specs that hook the lifecycle (`context_assembled`,
-`chat_turn_pre/post`, `buf_write`, …) and can register commands, contribute
-context, or provide UI surfaces, all through a stable API rather than core
+`chat_turn_pre/post`, `buf_write`, …), register commands, a **model slot**, or a
+**UI surface** (like the chat panel), all through a stable API rather than core
 internals. Register them in `setup()`:
 
 ```lua
 require("ami").setup({
   extensions = {
-    require("ami-custom-proactive"),   -- a spec table
+    require("ami-inline"),             -- a spec table
     "my-org.ami-notes",                -- or a module name to require()
   },
-  -- disable_extensions = { "proactive" },
+  -- disable_extensions = { "inline" },
 })
 ```
 
-ami ships **no active extensions** itself. Proactive suggestions, which used to be
-built in, now live in
-[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim) —
-install it and add `require("ami-custom-proactive")` to `extensions` to get
-`:AmiProactive`/`:AmiNudge` back. `:AmiExtensions` lists what's loaded.
+ami ships **no active extensions** itself. First-party ones, each in their own repo:
 
-Writing your own (including publishing it as its own `ami-*.nvim` repo) is
-documented in [`docs/extensions.md`](docs/extensions.md), with the full API, event
-reference, and roadmap.
+- [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) — inline (FIM)
+  completion; registers a `fim` model slot.
+- [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim) —
+  proactive suggestions; registers a `proactive` model slot.
+- [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) — a
+  split-window chat UI (a `chat_ui` provider).
+
+`:AmiExtensions` lists what's loaded. Writing your own (including publishing it as
+its own `ami-*.nvim` repo) is documented in
+[`docs/extensions.md`](docs/extensions.md), with the full API, events, the model
+registry, the `chat_ui` contract, and the roadmap.
 
 ## How it works
 

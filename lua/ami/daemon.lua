@@ -143,7 +143,9 @@ local function build_env()
   if addr ~= "" then
     env.AMI_ADDR = addr
   end
-  local chat = config.options.chat or {}
+  -- Resolve the chat provider through the model registry (chat slot overrides,
+  -- else the default model slot).
+  local chat = require("ami.models").effective("chat")
   if chat.endpoint and chat.endpoint ~= "" then
     env.AMI_LMSTUDIO_URL = chat.endpoint
   end

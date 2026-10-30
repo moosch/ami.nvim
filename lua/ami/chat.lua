@@ -5,7 +5,6 @@
 -- api.provide("chat_ui", impl). See ami.chat_ui for the renderer contract.
 local client = require("ami.client")
 local context = require("ami.context")
-local config = require("ami.config")
 local events = require("ami.events")
 local extensions = require("ami.extensions")
 local log = require("ami.log")
@@ -102,7 +101,7 @@ local function send(message, selection, range)
     local req = {
       session_id = M.session_id,
       message = message,
-      model = (config.options.chat or {}).model,
+      model = require("ami.models").effective("chat").model,
       context = ctx,
     }
     events.emit("chat_turn_pre", req)

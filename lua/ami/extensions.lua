@@ -161,6 +161,20 @@ local function make_api(spec)
     end,
   }
 
+  -- Model registry: register a selectable model slot, read the default, or resolve
+  -- a slot's effective { endpoint, model }. See ami.models.
+  api.models = {
+    register = function(slot)
+      return require("ami.models").register(slot)
+    end,
+    default = function()
+      return require("ami.models").default()
+    end,
+    effective = function(name)
+      return require("ami.models").effective(name)
+    end,
+  }
+
   return api
 end
 

@@ -6,8 +6,10 @@ API, instead of reaching into core internals. An extension can live in this repo
 or — more usefully — in its own Neovim plugin repo that returns a spec.
 
 Reference extensions, each in its own repo:
+[`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) (inline/FIM
+completion — registers a model slot),
 [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
-(proactive suggestions — events, commands, daemon calls) and
+(proactive suggestions — events, commands, daemon calls, a model slot), and
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
 (a split-window chat UI — a full `chat_ui` provider). A tiny in-tree template
 lives at `lua/ami/extensions/example.lua`.
@@ -68,6 +70,7 @@ User config for an extension lives under its `name`
 | `api.chat` | `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()` |
 | `api.client` | `stream(path, body, cbs)`, `post_json(path, body, cb, opts)` — talk to the daemon |
 | `api.context` | `gather_async(bufnr, win, selection, range, cb)`, `project_root(bufnr)` |
+| `api.models` | `register(slot)`, `default()`, `effective(name)` — the model registry (below) |
 
 ## Lifecycle events
 
@@ -122,6 +125,34 @@ mix a custom renderer with the built-in (they wouldn't share buffers). Use
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) for a
 split-window `chat_ui` packaged as its own repo.
 
+## Model registry
+
+Core owns a single **default** model slot (`config.model` = base provider + model).
+Any feature that uses a model registers its own **slot** via `api.models.register`;
+a slot that leaves its model unset falls back to the default. The `:AmiModel`
+selector lists every registered slot, so your extension's model becomes selectable
+automatically.
+
+```lua
+setup = function(api)
+  api.models.register({
+    name = "fim",                 -- unique; shown in :AmiModel
+    label = "Inline (FIM)",       -- optional display label
+    endpoint = function() return api.config.endpoint end,  -- nil ⇒ default provider
+    get      = function() return api.config.model end,     -- nil ⇒ default model
+    set      = function(m) api.config.model = m end,       -- persist the pick
+  })
+end
+```
+
+- `api.models.default()` → the default slot `{ endpoint, model }`.
+- `api.models.effective(name)` → a slot's resolved `{ endpoint, model }` (its
+  overrides, else the default). Use this when you actually make a request, so you
+  honour both the user's per-slot pick and the default fallback.
+
+`ami-inline.nvim` is the reference: it registers a `fim` slot and resolves its
+provider with `api.models.effective("fim")` on each completion.
+
 ## Publishing as its own repo
 
 Structure it like any Neovim plugin:
@@ -144,18 +175,19 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **Inline completion** as an extension.
-2. **Model selector** as an extension.
-3. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
+1. **Chat as an extension** (`ami-chat.nvim`): move the chat controller out of core
+   so core is a pure runtime; it would register the `chat` model slot (which core
+   does today) with no API change.
+2. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
    Doable via `chat_turn_pre` once the daemon accepts an optional `instructions`
    field and merges it into the system prompt (`internal/prompt/system.go`).
-4. **Context-provider extensions** via `context_assembled`: git diff/blame,
+3. **Context-provider extensions** via `context_assembled`: git diff/blame,
    test/build output, LSP diagnostics, a project-conventions file.
-5. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
+4. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
    likely an out-of-process HTTP protocol for context/prompt middleware.
-6. **rtp auto-discovery** of installed extensions, and **project-local
+5. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
-7. **Packaging convention**: extensions as their own `ami-*.nvim` repos exposing a
-   spec (proven by `ami-custom-proactive.nvim`).
 
-**Done:** the `chat_ui` capability (swappable chat panel) — see above.
+**Done:** the `chat_ui` capability (swappable chat panel); the model registry +
+generic selector; inline completion (`ami-inline.nvim`) and the packaging
+convention (`ami-*.nvim` repos exposing a spec).

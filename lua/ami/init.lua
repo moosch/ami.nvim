@@ -5,7 +5,6 @@
 local config = require("ami.config")
 local client = require("ami.client")
 local chat = require("ami.chat")
-local inline = require("ami.inline")
 local tree = require("ami.tree")
 local models = require("ami.models")
 local daemon = require("ami.daemon")
@@ -14,9 +13,8 @@ local extensions = require("ami.extensions")
 
 local M = {}
 
--- Re-export sub-APIs: require("ami").chat.toggle(), .inline.trigger() etc.
+-- Re-export sub-APIs: require("ami").chat.toggle(), .tree.open() etc.
 M.chat = chat
-M.inline = inline
 M.tree = tree
 M.models = models
 M.daemon = daemon
@@ -59,20 +57,20 @@ function M.register_commands()
 
   vim.api.nvim_create_user_command("AmiModel", function(opts)
     local m = require("ami.models")
-    if opts.args == "chat" or opts.args == "fim" then
+    if opts.args ~= "" then
       m.select(opts.args)
     else
       m.pick()
     end
   end, {
     nargs = "?",
-    complete = function() return { "chat", "fim" } end,
-    desc = "Select the chat or FIM model (no arg = choose which)",
+    complete = function() return require("ami.models").slot_names() end,
+    desc = "Select a model for a registered slot (no arg = choose which)",
   })
 
   vim.api.nvim_create_user_command("AmiModels", function()
     require("ami.models").show()
-  end, { desc = "Show the current chat and FIM models" })
+  end, { desc = "Show each model slot's current model" })
 
   vim.api.nvim_create_user_command("AmiExtensions", function()
     local names = require("ami.extensions").list()
@@ -106,14 +104,6 @@ function M.register_commands()
   vim.api.nvim_create_user_command("AmiDebug", function()
     require("ami.log").toggle_debug()
   end, { desc = "Toggle verbose ami debug logging" })
-
-  vim.api.nvim_create_user_command("AmiComplete", function()
-    require("ami.inline").trigger()
-  end, { desc = "Request an inline (ghost-text) completion" })
-
-  vim.api.nvim_create_user_command("AmiInlineAuto", function()
-    require("ami.inline").toggle_auto()
-  end, { desc = "Toggle inline auto-trigger on/off" })
 end
 
 --- Configure the plugin.
@@ -122,7 +112,7 @@ function M.setup(opts)
   config.setup(opts)
   M.register_commands()
   events.install()
-  inline.setup()
+  models.setup() -- register the default + chat model slots (before the daemon reads them)
   daemon.setup()
 
   -- Extensions: skip any the user disabled, register the rest (specs or module

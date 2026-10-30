@@ -1,83 +1,158 @@
--- ami.models: runtime model selector for the chat and FIM (inline) models.
+-- ami.models: the model registry and a generic runtime selector.
 --
--- Models are chosen at runtime (they change often), not pinned in config — the
--- config values are only the defaults/fallbacks. Selection uses vim.ui.select,
--- so it inherits whatever picker the user has (telescope/fzf/snacks/built-in).
+-- Core owns one *default* model slot (config.model: base provider + model). Any
+-- feature that uses a model registers a *slot* describing its provider and how to
+-- read/write its chosen model; a slot with no model of its own falls back to the
+-- default. The selector (:AmiModel) is generic — it lists every registered slot,
+-- so installing an extension that uses a model makes it selectable automatically.
+--
+-- A slot:
+--   { name = "fim", label = "Inline (FIM)",     -- unique id (+ optional label)
+--     endpoint = function() return url|nil end,  -- provider base URL, nil -> default
+--     get      = function() return model|nil end,-- current override, nil -> default
+--     set      = function(model) ... end }        -- persist the choice
 local client = require("ami.client")
 local config = require("ami.config")
 local log = require("ami.log")
 
 local M = {}
 
---- Current model selections for chat and FIM.
-function M.get()
+---@type table<string, table>
+local slots = {}
+---@type string[] registration order
+local order = {}
+
+--- The default model slot (base provider + model).
+function M.default()
+  return config.options.model or {}
+end
+
+--- Register (or replace) a model slot.
+---@param slot table
+function M.register(slot)
+  if type(slot) ~= "table" or type(slot.name) ~= "string" or slot.name == "" then
+    log.error("models: invalid slot (needs a non-empty string `name`)")
+    return
+  end
+  if not slots[slot.name] then
+    order[#order + 1] = slot.name
+  end
+  slots[slot.name] = slot
+  log.debug("models: registered slot '" .. slot.name .. "'")
+end
+
+--- Resolve a slot's effective { endpoint, model }, falling back to the default for
+--- anything the slot leaves unset.
+---@param name string
+---@return table {endpoint, model}
+function M.effective(name)
+  local d = M.default()
+  local s = slots[name]
+  if not s then
+    return { endpoint = d.endpoint, model = d.model }
+  end
+  local ep = s.endpoint and s.endpoint() or nil
+  local m = s.get and s.get() or nil
   return {
-    chat = (config.options.chat or {}).model,
-    fim = (config.options.inline or {}).model,
+    endpoint = (ep and ep ~= "") and ep or d.endpoint,
+    model = (m and m ~= "") and m or d.model,
   }
 end
 
--- The provider endpoint backing each target (chat and inline may differ).
-local function endpoint(target)
-  if target == "fim" then
-    return (config.options.inline or {}).endpoint
-  end
-  return (config.options.chat or {}).endpoint
+--- Registered slot names, in registration order.
+---@return string[]
+function M.slot_names()
+  return vim.list_slice(order)
 end
 
-local function set(target, choice)
-  if target == "fim" then
-    config.options.inline = config.options.inline or {}
-    config.options.inline.model = choice
-  else
-    config.options.chat = config.options.chat or {}
-    config.options.chat.model = choice
+--- Pick a model for the named slot from its provider's live list.
+---@param name string
+function M.select(name)
+  local slot = slots[name]
+  if not slot then
+    vim.notify("ami: no such model slot '" .. tostring(name) .. "'", vim.log.levels.WARN)
+    return
   end
-  log.info(("models: %s model → %s"):format(target, choice))
-  vim.notify(("ami: %s model → %s"):format(target, choice), vim.log.levels.INFO)
-end
-
---- Pick a model for `target` ("chat" or "fim") from its provider's live list.
----@param target "chat"|"fim"
-function M.select(target)
-  client.models_from(endpoint(target), function(ok, ids)
+  local eff = M.effective(name)
+  client.models_from(eff.endpoint, function(ok, ids)
     if not ok then
       log.error("models: " .. tostring(ids))
       return
     end
     if type(ids) ~= "table" or #ids == 0 then
-      vim.notify("ami: no models reported by LM Studio", vim.log.levels.WARN)
+      vim.notify("ami: no models reported by " .. tostring(eff.endpoint), vim.log.levels.WARN)
       return
     end
-    local current = M.get()[target]
     vim.ui.select(ids, {
-      prompt = ("Select %s model (current: %s):"):format(target, current or "unset"),
+      prompt = ("Select %s model (current: %s):"):format(name, eff.model or "unset"),
       format_item = function(item)
-        -- Mark the currently selected model so it stands out in the picker.
-        return (item == current and "● " or "  ") .. item
+        -- Mark the effective current model so it stands out.
+        return (item == eff.model and "● " or "  ") .. item
       end,
     }, function(choice)
-      if choice then
-        set(target, choice)
+      if not choice then
+        return
       end
+      if slot.set then
+        slot.set(choice)
+      end
+      log.info(("models: %s model → %s"):format(name, choice))
+      vim.notify(("ami: %s model → %s"):format(name, choice), vim.log.levels.INFO)
     end)
   end)
 end
 
---- Two-step picker: choose target (chat/fim), then model.
+--- Two-step picker: choose a slot, then a model.
 function M.pick()
-  vim.ui.select({ "chat", "fim" }, { prompt = "Set model for:" }, function(target)
-    if target then
-      M.select(target)
+  if #order == 0 then
+    vim.notify("ami: no model slots registered", vim.log.levels.WARN)
+    return
+  end
+  vim.ui.select(M.slot_names(), {
+    prompt = "Set model for:",
+    format_item = function(name)
+      local s = slots[name]
+      return (s and s.label) or name
+    end,
+  }, function(name)
+    if name then
+      M.select(name)
     end
   end)
 end
 
---- Report the current selections.
+--- Report every slot's effective model.
 function M.show()
-  local m = M.get()
-  vim.notify(("ami models — chat: %s · fim: %s"):format(
-    m.chat or "(unset)", m.fim or "(none)"), vim.log.levels.INFO)
+  local parts = {}
+  for _, name in ipairs(order) do
+    parts[#parts + 1] = ("%s: %s"):format(name, M.effective(name).model or "(unset)")
+  end
+  local body = (#parts > 0) and table.concat(parts, " · ") or "(no slots)"
+  vim.notify("ami models — " .. body, vim.log.levels.INFO)
+end
+
+--- Register the core slots: the default provider, and chat (still core).
+function M.setup()
+  M.register({
+    name = "default",
+    label = "Default (base provider)",
+    endpoint = function() return M.default().endpoint end,
+    get = function() return M.default().model end,
+    set = function(m)
+      config.options.model = config.options.model or {}
+      config.options.model.model = m
+    end,
+  })
+  M.register({
+    name = "chat",
+    label = "Chat / advisor",
+    endpoint = function() return (config.options.chat or {}).endpoint end,
+    get = function() return (config.options.chat or {}).model end,
+    set = function(m)
+      config.options.chat = config.options.chat or {}
+      config.options.chat.model = m
+    end,
+  })
 end
 
 return M

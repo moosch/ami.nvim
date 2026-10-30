@@ -54,8 +54,8 @@ first run when `go` is available.
                                                               *ami.setup()*
 require("ami").setup({opts})
 
-Call once. Registers commands, configures inline completion, and starts the
-managed daemon (unless `daemon.auto_start = false`). See
+Call once. Registers commands, the model registry, any extensions, and starts
+the managed daemon (unless `daemon.auto_start = false`). See
 |ami-configuration| for {opts}.
 
 ==============================================================================
@@ -78,24 +78,20 @@ managed daemon (unless `daemon.auto_start = false`). See
 :AmiTree          Open the conversation tree: branch, switch branches, and
                       summarize. Keys: <CR> switch, s summarize, r refresh, q.
 
-                                                              *:AmiComplete*
-:AmiComplete      Request an inline (ghost-text) FIM completion.
-
-                                                            *:AmiInlineAuto*
-:AmiInlineAuto    Toggle inline auto-trigger (debounced as-you-type).
-
                                                                  *:AmiModel*
-:AmiModel [chat|fim]
-                      Select the chat or FIM model at runtime (live list from
-                      LM Studio). No argument prompts for which first.
+:AmiModel [slot]
+                      Pick a model for a registered slot (live list from the
+                      slot's provider). No argument prompts for which slot. Slots:
+                      default, chat, and any an extension registers (e.g. fim).
 
                                                                 *:AmiModels*
-:AmiModels        Show the current chat and FIM model selections.
+:AmiModels        Show each model slot's current model.
 
                                                             *:AmiExtensions*
-:AmiExtensions    List the loaded extensions. Extensions may add their own
-                  commands (e.g. ami-custom-proactive.nvim adds :AmiProactive
-                  and :AmiNudge). See |ami-extensions|.
+:AmiExtensions    List the loaded extensions. Extensions add their own commands
+                  (e.g. ami-inline.nvim adds :AmiComplete / :AmiInlineAuto;
+                  ami-custom-proactive.nvim adds :AmiProactive / :AmiNudge). See
+                  |ami-extensions|.
 
                                                                 *:AmiDaemon*
 :AmiDaemon [start|stop|restart]
@@ -107,18 +103,18 @@ managed daemon (unless `daemon.auto_start = false`). See
                                                                    *:AmiLog*
 :AmiLog           Open the log viewer. *:AmiDebug* toggles verbose logs.
 
-Default inline insert-mode keys (configurable): <C-g> request, <Tab> accept
-(falls back to a real Tab when no suggestion), <C-]> dismiss.
-
 ==============================================================================
 6. CONFIGURATION                                         *ami-configuration*
 
 Defaults (pass overrides to |ami.setup()|): >
     require("ami").setup({
       daemon_url = "http://127.0.0.1:8787",
-      chat = {                      -- chat/advisor provider (via the daemon)
+      model = {                     -- default model slot (every slot falls back here)
         endpoint = "http://localhost:1234/v1",
-        model = "qwen3-coder",      -- change live with :AmiModel
+        model = "qwen3-coder",      -- pick per slot live with :AmiModel
+      },
+      chat = {                      -- chat/advisor provider (via the daemon)
+        -- endpoint, model          -- omit to inherit the default `model` slot
         ui = {                      -- chat panel placement/appearance
           position = "right",       -- "right" | "left" | "center"
           width = 0.4, height = 0.9,-- fraction of screen (<=1) or absolute cells
@@ -135,24 +131,13 @@ Defaults (pass overrides to |ami.setup()|): >
         lsp_deps = true, dep_max_files = 5,
         dep_timeout_ms = 1500, dep_max_positions = 30,
       },
-      inline = {                    -- completion provider (direct; may differ from chat)
-        enabled = true,
-        endpoint = "http://localhost:1234/v1",
-        model = "qwen3-coder",
-        prewarm = true,             -- load the model on setup (fast first completion)
-        auto = false, debounce_ms = 400,
-        max_tokens = 256, max_lines = 0, temperature = 0.2,
-        context_before_lines = 120, context_after_lines = 60,
-        fim = { prefix = "<|fim_prefix|>", suffix = "<|fim_suffix|>",
-                middle = "<|fim_middle|>" },
-        keymaps = { trigger = "<C-g>", accept = "<Tab>", dismiss = "<C-]>" },
-      },
       extensions = {},          -- extension specs or module names to register
       disable_extensions = {},  -- names of extensions to skip
     })
 <
-An extension's own options live under its name (e.g. `proactive = { ... }` for
-ami-custom-proactive.nvim). See |ami-extensions|.
+Inline completion is the ami-inline.nvim extension; install it and add
+require("ami-inline") to `extensions`. An extension's own options live under its
+name (e.g. `inline = { ... }`, `proactive = { ... }`). See |ami-extensions|.
 ==============================================================================
 7. EXTENSIONS                                             *ami-extensions*
 
