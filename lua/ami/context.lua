@@ -6,6 +6,7 @@
 -- the cursor (or within a selected range) are resolved to file paths and sent as
 -- dep_paths; the daemon reads and trims them.
 local config = require("ami.config")
+local events = require("ami.events")
 local log = require("ami.log")
 
 local M = {}
@@ -128,6 +129,16 @@ end
 function M.gather_async(bufnr, winid, selection, range, cb)
   bufnr = (bufnr and vim.api.nvim_buf_is_valid(bufnr)) and bufnr or vim.api.nvim_get_current_buf()
   local refs = base_refs(bufnr, winid, selection)
+
+  -- Emit context_assembled just before handing the refs back, whichever path we
+  -- return by. Extensions may MUTATE refs here (e.g. add dep_paths or notes).
+  do
+    local user_cb = cb
+    cb = function(r)
+      events.emit("context_assembled", r, { bufnr = bufnr, winid = winid })
+      user_cb(r)
+    end
+  end
 
   local cctx = config.options.context or {}
   if cctx.lsp_deps == false or not any_client_supports_definition(bufnr) then

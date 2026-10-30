@@ -41,6 +41,8 @@ local M = {}
 ---@field chat AmiChatConfig
 ---@field context AmiContextConfig
 ---@field inline AmiInlineConfig
+---@field extensions (table|string)[] Extension specs, or module names to require().
+---@field disable_extensions string[] Names of extensions to skip registering.
 M.defaults = {
   daemon_url = "http://127.0.0.1:8787",
   -- The chat/advisor provider. Chat requests go through the amid daemon to this
@@ -73,17 +75,12 @@ M.defaults = {
     dep_timeout_ms = 1500,
     dep_max_positions = 30,
   },
-  -- Proactive guidance: an occasional unsolicited suggestion in the chat panel.
-  -- OFF by default; opt in with proactive.enabled = true or :AmiProactive.
-  proactive = {
-    enabled = false,
-    on_idle = true,       -- suggest after idle_ms of inactivity
-    idle_ms = 20000,
-    on_save = true,       -- suggest after writing a buffer
-    min_interval_s = 180, -- rate limit: minimum seconds between suggestions
-    require_normal_mode = true, -- don't interrupt while typing in insert mode
-    notify = true,        -- low-key notification when a suggestion arrives
-  },
+  -- Extensions: optional capabilities that hook ami's lifecycle. Each entry is an
+  -- extension spec table or a module name to require() (e.g. an installed
+  -- ami-*.nvim repo). See docs/extensions.md. ami core ships no active extensions.
+  extensions = {},
+  -- Names of extensions to skip registering (e.g. a built-in you don't want).
+  disable_extensions = {},
   inline = {
     enabled = true,
     endpoint = "http://localhost:1234/v1",

@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.3.1).** It works and is covered by tests,
+> ⚠️ **Status: early / experimental (v0.4.0).** It works and is covered by tests,
 > but it hasn't been battle-tested in day-to-day interactive use — expect sharp
 > edges, and pin a commit if you depend on it. Feedback and issues welcome.
 
@@ -26,8 +26,10 @@ thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic
 - **Branching history tree** — every message is a node; branch from any point and
   switch between branches. Summarize an old branch to shrink context
   non-destructively.
-- **Proactive suggestions** — off by default; an occasional unsolicited aside on
-  idle or save, rate-limited and never mid-typing.
+- **Extensions** — a small core with a lifecycle hook + capability API, so optional
+  features live as self-contained extensions (in your config or their own repo).
+  Proactive suggestions ship as the reference extension,
+  [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim).
 - **Runtime model selector** — pick the chat and FIM models live from whatever
   LM Studio has loaded.
 - **Managed daemon** — started/stopped with Neovim, reference-counted so it's
@@ -104,10 +106,13 @@ Runtime model selector — swap chat/FIM models on the fly:
 | `:AmiInlineAuto` | Toggle inline auto-trigger |
 | `:AmiModel [chat\|fim]` | Select the chat/FIM model at runtime |
 | `:AmiModels` | Show current model selections |
-| `:AmiProactive` | Toggle proactive suggestions (off by default) |
-| `:AmiNudge` | Request a proactive suggestion now |
+| `:AmiExtensions` | List the loaded extensions |
 | `:AmiDaemon [start\|stop\|restart]` | Control the managed daemon |
 | `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Status / log viewer / verbose logging |
+
+Extensions may add their own commands — e.g.
+[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
+adds `:AmiProactive` and `:AmiNudge`.
 
 Default inline insert-mode keys (configurable): `<C-g>` request, `<Tab>` accept
 (falls back to a real Tab when none shown), `<C-]>` dismiss.
@@ -192,6 +197,34 @@ defaults to `stdpath("data")/ami/<project>/sessions/` — **outside your
 repositories**, so nothing leaks into your working tree. Set `session_dir = ""`
 to instead keep it in each project's own `.ami/sessions/` (add `.ami/` to
 your global gitignore if you do).
+
+## Extensions
+
+ami keeps a small core and moves optional features into **extensions** —
+self-contained Lua specs that hook the lifecycle (`context_assembled`,
+`chat_turn_pre/post`, `buf_write`, …) and can register commands, contribute
+context, or provide UI surfaces, all through a stable API rather than core
+internals. Register them in `setup()`:
+
+```lua
+require("ami").setup({
+  extensions = {
+    require("ami-custom-proactive"),   -- a spec table
+    "my-org.ami-notes",                -- or a module name to require()
+  },
+  -- disable_extensions = { "proactive" },
+})
+```
+
+ami ships **no active extensions** itself. Proactive suggestions, which used to be
+built in, now live in
+[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim) —
+install it and add `require("ami-custom-proactive")` to `extensions` to get
+`:AmiProactive`/`:AmiNudge` back. `:AmiExtensions` lists what's loaded.
+
+Writing your own (including publishing it as its own `ami-*.nvim` repo) is
+documented in [`docs/extensions.md`](docs/extensions.md), with the full API, event
+reference, and roadmap.
 
 ## How it works
 

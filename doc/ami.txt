@@ -9,8 +9,9 @@ CONTENTS                                                      *ami-contents*
   4. Setup ...................................... |ami-setup|
   5. Commands ................................... |ami-commands|
   6. Configuration .............................. |ami-configuration|
-  7. How it works ............................... |ami-architecture|
-  8. Health ..................................... |ami-health|
+  7. Extensions ................................. |ami-extensions|
+  8. How it works ............................... |ami-architecture|
+  9. Health ..................................... |ami-health|
 
 ==============================================================================
 1. INTRODUCTION                                           *ami-introduction*
@@ -91,11 +92,10 @@ managed daemon (unless `daemon.auto_start = false`). See
                                                                 *:AmiModels*
 :AmiModels        Show the current chat and FIM model selections.
 
-                                                             *:AmiProactive*
-:AmiProactive     Toggle proactive suggestions on/off (off by default).
-
-                                                                 *:AmiNudge*
-:AmiNudge         Request a proactive suggestion now.
+                                                            *:AmiExtensions*
+:AmiExtensions    List the loaded extensions. Extensions may add their own
+                  commands (e.g. ami-custom-proactive.nvim adds :AmiProactive
+                  and :AmiNudge). See |ami-extensions|.
 
                                                                 *:AmiDaemon*
 :AmiDaemon [start|stop|restart]
@@ -147,15 +147,36 @@ Defaults (pass overrides to |ami.setup()|): >
                 middle = "<|fim_middle|>" },
         keymaps = { trigger = "<C-g>", accept = "<Tab>", dismiss = "<C-]>" },
       },
-      proactive = {
-        enabled = false, on_idle = true, idle_ms = 20000,
-        on_save = true, min_interval_s = 180,
-        require_normal_mode = true, notify = true,
-      },
+      extensions = {},          -- extension specs or module names to register
+      disable_extensions = {},  -- names of extensions to skip
     })
 <
+An extension's own options live under its name (e.g. `proactive = { ... }` for
+ami-custom-proactive.nvim). See |ami-extensions|.
 ==============================================================================
-7. HOW IT WORKS                                           *ami-architecture*
+7. EXTENSIONS                                             *ami-extensions*
+
+ami keeps a small core; optional features are extensions — self-contained Lua
+specs that hook the lifecycle through a stable API instead of core internals.
+Register specs, or module names to require(), in |ami.setup()|: >
+    require("ami").setup({
+      extensions = {
+        require("ami-custom-proactive"),  -- a spec table
+        "my-org.ami-notes",               -- or a module name to require()
+      },
+      -- disable_extensions = { "proactive" },
+    })
+<
+ami ships no active extensions itself. Proactive suggestions (formerly built in)
+now live in the ami-custom-proactive.nvim repo. `:AmiExtensions` lists what is
+loaded. Lifecycle events: setup, context_assembled, chat_turn_pre,
+chat_turn_post, buf_write.
+
+Full API, event reference, and a guide to writing/publishing your own are in
+docs/extensions.md in the repository.
+
+==============================================================================
+8. HOW IT WORKS                                           *ami-architecture*
 
   Neovim (Lua)  --HTTP+SSE-->  amid (Go)  --OpenAI API-->  LM Studio
 
@@ -167,7 +188,7 @@ Conversation history is a branching tree stored under `session_dir`
 (default stdpath("data")/ami/<project>/), kept out of your repositories.
 
 ==============================================================================
-8. HEALTH                                                       *ami-health*
+9. HEALTH                                                       *ami-health*
 
 Run `:checkhealth ami` to verify Neovim version, curl, Go, the daemon
 binary, the daemon, and LM Studio reachability.

@@ -9,7 +9,8 @@ local inline = require("ami.inline")
 local tree = require("ami.tree")
 local models = require("ami.models")
 local daemon = require("ami.daemon")
-local proactive = require("ami.proactive")
+local events = require("ami.events")
+local extensions = require("ami.extensions")
 
 local M = {}
 
@@ -19,7 +20,8 @@ M.inline = inline
 M.tree = tree
 M.models = models
 M.daemon = daemon
-M.proactive = proactive
+M.events = events
+M.extensions = extensions
 
 --- Register the :Ami* user commands. Safe to call more than once
 --- (later calls overwrite). Called by setup() and by plugin/ami.lua so the
@@ -72,13 +74,14 @@ function M.register_commands()
     require("ami.models").show()
   end, { desc = "Show the current chat and FIM models" })
 
-  vim.api.nvim_create_user_command("AmiProactive", function()
-    require("ami.proactive").toggle()
-  end, { desc = "Toggle proactive suggestions on/off" })
-
-  vim.api.nvim_create_user_command("AmiNudge", function()
-    require("ami.proactive").nudge(true)
-  end, { desc = "Request a proactive suggestion now" })
+  vim.api.nvim_create_user_command("AmiExtensions", function()
+    local names = require("ami.extensions").list()
+    if #names == 0 then
+      vim.notify("ami: no extensions loaded", vim.log.levels.INFO)
+    else
+      vim.notify("ami extensions: " .. table.concat(names, ", "), vim.log.levels.INFO)
+    end
+  end, { desc = "List the loaded ami extensions" })
 
   vim.api.nvim_create_user_command("AmiDaemon", function(opts)
     local d = require("ami.daemon")
@@ -118,9 +121,17 @@ end
 function M.setup(opts)
   config.setup(opts)
   M.register_commands()
+  events.install()
   inline.setup()
   daemon.setup()
-  proactive.setup()
+
+  -- Extensions: skip any the user disabled, register the rest (specs or module
+  -- names), then run their setup(). ami core ships no active extensions itself.
+  extensions.disable(config.options.disable_extensions)
+  for _, spec in ipairs(config.options.extensions or {}) do
+    extensions.register(spec)
+  end
+  extensions.setup_all()
 end
 
 --- Ping the daemon and report its status.

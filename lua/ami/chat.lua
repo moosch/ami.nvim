@@ -5,6 +5,7 @@
 local client = require("ami.client")
 local context = require("ami.context")
 local config = require("ami.config")
+local events = require("ami.events")
 local log = require("ami.log")
 
 local STATUS = "⏳ waiting for the model… (the first reply can be slow while it loads)"
@@ -230,6 +231,21 @@ function M.toggle()
   end
 end
 
+--- Open the chat panel if it isn't already visible (never closes it). Part of the
+--- extension-facing API (api.chat.open).
+function M.open()
+  if transcript_visible() or (M.prompt_win and vim.api.nvim_win_is_valid(M.prompt_win)) then
+    return
+  end
+  open_prompt()
+end
+
+--- Append raw text to the transcript (extension-facing; api.chat.append).
+---@param text string
+function M.append(text)
+  append(text)
+end
+
 -- Stream one turn to the daemon and render it into the transcript.
 local function send(message, selection, range)
   if M.streaming then
@@ -246,12 +262,17 @@ local function send(message, selection, range)
       M.session_id, ctx.project_root, ctx.active_path ~= "" and ctx.active_path or "(none)",
       #(ctx.dep_paths or {}), #message))
 
-    client.stream("/chat", {
+    -- The outgoing request. Extensions may mutate it (e.g. inject a persona or
+    -- extra context) via the chat_turn_pre event before it is sent.
+    local req = {
       session_id = M.session_id,
       message = message,
       model = (config.options.chat or {}).model,
       context = ctx,
-    }, {
+    }
+    events.emit("chat_turn_pre", req)
+
+    client.stream("/chat", req, {
       on_token = function(c)
         clear_status()
         append(c)
@@ -260,11 +281,13 @@ local function send(message, selection, range)
         M.streaming = false
         clear_status()
         append("\n")
+        events.emit("chat_turn_post", { ok = true, session_id = req.session_id })
       end,
       on_error = function(e)
         M.streaming = false
         clear_status()
         append("\n_[error: " .. e .. "]_\n")
+        events.emit("chat_turn_post", { ok = false, session_id = req.session_id, error = e })
       end,
     })
   end)
