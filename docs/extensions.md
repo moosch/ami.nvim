@@ -5,9 +5,12 @@ self-contained Lua tables that hook into the agent's lifecycle through a stable
 API, instead of reaching into core internals. An extension can live in this repo
 or — more usefully — in its own Neovim plugin repo that returns a spec.
 
-The reference extension is [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
-(proactive suggestions). A tiny in-tree template lives at
-`lua/ami/extensions/example.lua`.
+Reference extensions, each in its own repo:
+[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
+(proactive suggestions — events, commands, daemon calls) and
+[`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
+(a split-window chat UI — a full `chat_ui` provider). A tiny in-tree template
+lives at `lua/ami/extensions/example.lua`.
 
 ## Registering an extension
 
@@ -115,7 +118,9 @@ end
 
 Implement every method — the controller assumes the whole contract and does not
 mix a custom renderer with the built-in (they wouldn't share buffers). Use
-`ami.chat_ui` as the reference implementation.
+`ami.chat_ui` (floating panel) as the reference implementation, or
+[`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) for a
+split-window `chat_ui` packaged as its own repo.
 
 ## Publishing as its own repo
 
