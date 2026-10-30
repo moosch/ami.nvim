@@ -1,4 +1,4 @@
-.PHONY: build run test tidy clean demos
+.PHONY: build run test tidy clean demos optimize-demos
 
 BIN := bin/amid
 
@@ -26,3 +26,12 @@ demos:
 	vhs demos/tree.tape
 	vhs demos/tree-branch.tape
 	vhs demos/model.tape
+	@$(MAKE) optimize-demos
+
+# Shrink the rendered GIFs for GitHub (best-effort; no-op without gifsicle).
+optimize-demos:
+	@if command -v gifsicle >/dev/null; then \
+		for f in demos/*.gif; do gifsicle -O3 --lossy=80 -b "$$f" && echo "optimized $$f"; done; \
+	else \
+		echo "gifsicle not installed — skipping GIF optimization (brew install gifsicle)"; \
+	fi
