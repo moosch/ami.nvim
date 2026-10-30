@@ -33,7 +33,7 @@ Type "printf 'package store\n\nimport (\n\t\042context\042\n\t\042database/sql\0
 Enter
 Type "AMI_CHAT_MODEL=${AMI_CHAT_MODEL:-qwen3-coder} nvim -u demos/init.lua /tmp/ami_chat_demo.go"
 Enter
-Sleep 5s           # let the daemon start and become ready
+Sleep 2s           # let the editor settle
 Show
 Sleep 1500ms       # show the plain source pane first
 

@@ -32,8 +32,6 @@ for _, mod in ipairs({ "ami-chat", "ami-inline" }) do
 end
 
 require("ami").setup({
-  -- Dedicated port so the demo never reuses (or clashes with) a real ami daemon.
-  daemon_url = "http://127.0.0.1:8799",
   -- The default model slot; chat inherits it unless overridden.
   model = { endpoint = endpoint, model = os.getenv("AMI_CHAT_MODEL") or "qwen3-coder" },
   extensions = extensions,
