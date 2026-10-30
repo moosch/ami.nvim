@@ -23,9 +23,18 @@ local M = {}
 ---@field stop string[] Stop sequences.
 ---@field keymaps table { trigger, accept, dismiss } insert-mode keys.
 
+---@class AmiChatUIConfig
+---@field position string "right" | "left" | "center" — where the panel sits.
+---@field width number Panel width: a fraction of columns (0<n<=1) or absolute columns (>1).
+---@field height number Panel height: a fraction of lines (0<n<=1) or absolute lines (>1).
+---@field opacity number 0 (invisible) .. 1 (opaque). Maps to 'winblend' so you can
+---  see the pane behind the panel.
+---@field margin integer Gap in columns from the screen edge (for right/left).
+
 ---@class AmiChatConfig
 ---@field endpoint string OpenAI-compatible base URL for the chat/advisor provider.
 ---@field model string Chat model name (change live with :AmiModel).
+---@field ui AmiChatUIConfig
 
 ---@class AmiConfig
 ---@field daemon_url string Base URL of the amid daemon.
@@ -39,6 +48,13 @@ M.defaults = {
   chat = {
     endpoint = "http://localhost:1234/v1",
     model = "qwen3-coder", -- change live with :AmiModel
+    ui = {
+      position = "right",   -- "right" | "left" | "center"
+      width = 0.4,          -- fraction of columns (<=1) or absolute columns (>1)
+      height = 0.9,         -- fraction of lines (<=1) or absolute lines (>1)
+      opacity = 0.8,        -- 0..1; lower = more see-through (via 'winblend')
+      margin = 2,           -- columns of gap from the screen edge (right/left)
+    },
   },
   -- Where conversation history is stored. nil = stdpath("data")/ami
   -- (outside your repos). Set to a path to override, or "" to use each project's

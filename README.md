@@ -131,6 +131,13 @@ require("ami").setup({
   chat = {
     endpoint = "http://localhost:1234/v1",
     model = "qwen3-coder",         -- change live with :AmiModel
+    ui = {
+      position = "right",          -- "right" | "left" | "center"
+      width = 0.4,                 -- fraction of columns (<=1) or absolute cols (>1)
+      height = 0.9,                -- fraction of lines   (<=1) or absolute lines (>1)
+      opacity = 0.8,               -- 0..1; lower = more see-through (via 'winblend')
+      margin = 2,                  -- columns of gap from the screen edge
+    },
   },
   session_dir = nil,               -- nil = stdpath("data")/ami (out of your repos)
                                    --  "" = each project's ./.ami/sessions

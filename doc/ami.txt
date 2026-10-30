@@ -119,6 +119,12 @@ Defaults (pass overrides to |ami.setup()|): >
       chat = {                      -- chat/advisor provider (via the daemon)
         endpoint = "http://localhost:1234/v1",
         model = "qwen3-coder",      -- change live with :AmiModel
+        ui = {                      -- chat panel placement/appearance
+          position = "right",       -- "right" | "left" | "center"
+          width = 0.4, height = 0.9,-- fraction of screen (<=1) or absolute cells
+          opacity = 0.8,            -- 0..1; lower = more see-through ('winblend')
+          margin = 2,               -- gap in columns from the screen edge
+        },
       },
       session_dir = nil,            -- nil = stdpath("data")/ami
                                     --  ""  = each project's ./.ami/sessions

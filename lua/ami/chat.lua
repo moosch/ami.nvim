@@ -23,13 +23,47 @@ local M = {
 
 -- Geometry -------------------------------------------------------------------
 
+-- The chat UI config block (position / width / height / opacity / margin).
+local function ui_opts()
+  return (config.options.chat or {}).ui or {}
+end
+
+-- Resolve a dimension given as either a fraction of `total` (0<v<=1) or an
+-- absolute cell count (v>1). Falls back to `default_frac` when unset.
+local function resolve_dim(v, total, default_frac)
+  if not v or v <= 0 then
+    return math.floor(total * default_frac)
+  end
+  if v <= 1 then
+    return math.floor(total * v)
+  end
+  return math.floor(v)
+end
+
 local function layout()
   local cols, rows = vim.o.columns, vim.o.lines
-  local width = math.min(110, math.max(60, math.floor(cols * 0.6)))
-  local col = math.floor((cols - width) / 2)
+  local ui = ui_opts()
+  local position = ui.position or "right"
+  local margin = ui.margin or 2
+
+  local width = resolve_dim(ui.width, cols, 0.4)
+  width = math.max(40, math.min(width, cols - 2))
+
   local prompt_h = 6
-  local total_h = math.max(prompt_h + 8, math.floor(rows * 0.78))
+  local total_h = resolve_dim(ui.height, rows, 0.9)
+  total_h = math.max(prompt_h + 8, math.min(total_h, rows - 2))
   local trans_h = total_h - prompt_h - 1
+
+  local col
+  if position == "left" then
+    col = margin
+  elseif position == "center" then
+    col = math.floor((cols - width) / 2)
+  else -- "right" (default)
+    col = cols - width - margin
+  end
+  col = math.max(0, col)
+
   local top = math.max(1, math.floor((rows - total_h) / 2) - 1)
   return {
     width = width,
@@ -37,6 +71,17 @@ local function layout()
     transcript = { row = top, height = trans_h },
     prompt = { row = top + trans_h + 2, height = prompt_h },
   }
+end
+
+-- Translate the configured opacity (0..1) into a 'winblend' value (0..100, where
+-- 0 is opaque) and apply it so the pane behind the panel shows through.
+local function apply_blend(win)
+  local opacity = ui_opts().opacity
+  if opacity == nil then
+    opacity = 1
+  end
+  local blend = math.floor((1 - opacity) * 100 + 0.5)
+  vim.wo[win].winblend = math.max(0, math.min(100, blend))
 end
 
 -- Transcript -----------------------------------------------------------------
@@ -74,6 +119,7 @@ local function show_transcript()
   })
   vim.wo[M.transcript_win].wrap = true
   vim.wo[M.transcript_win].linebreak = true
+  apply_blend(M.transcript_win)
 end
 
 -- Append text (which may contain newlines) to the transcript, keeping the view
@@ -158,6 +204,7 @@ local function open_prompt()
   })
   vim.wo[M.prompt_win].wrap = true
   vim.wo[M.prompt_win].linebreak = true
+  apply_blend(M.prompt_win)
 
   local opts = { buffer = M.prompt_buf, nowait = true, silent = true }
   -- Primary send: <Enter> in NORMAL mode (reliable across terminals). In insert
