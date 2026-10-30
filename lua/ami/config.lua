@@ -11,23 +11,9 @@ local M = {}
 ---@field endpoint string Default provider base URL (OpenAI-compatible).
 ---@field model string Default model name — the fallback every model slot uses.
 
----@class AmiChatUIConfig
----@field position string "right" | "left" | "center" — where the panel sits.
----@field width number Panel width: a fraction of columns (0<n<=1) or absolute columns (>1).
----@field height number Panel height: a fraction of lines (0<n<=1) or absolute lines (>1).
----@field opacity number 0 (invisible) .. 1 (opaque). Maps to 'winblend' so you can
----  see the pane behind the panel.
----@field margin integer Gap in columns from the screen edge (for right/left).
-
----@class AmiChatConfig
----@field endpoint string|nil Override the default provider for chat (nil = use `model`).
----@field model string|nil Override the default chat model (nil = use `model`; change live with :AmiModel).
----@field ui AmiChatUIConfig
-
 ---@class AmiConfig
 ---@field daemon_url string Base URL of the amid daemon.
 ---@field model AmiModelConfig The default model slot every slot falls back to.
----@field chat AmiChatConfig
 ---@field context AmiContextConfig
 ---@field extensions (table|string)[] Extension specs, or module names to require().
 ---@field disable_extensions string[] Names of extensions to skip registering.
@@ -39,19 +25,6 @@ M.defaults = {
   model = {
     endpoint = "http://localhost:1234/v1",
     model = "qwen3-coder",
-  },
-  -- The chat/advisor provider. Omit endpoint/model to inherit the default `model`
-  -- slot above; set them to point chat at a different provider/model.
-  chat = {
-    -- endpoint = nil,  -- inherit model.endpoint
-    -- model = nil,     -- inherit model.model
-    ui = {
-      position = "right",   -- "right" | "left" | "center"
-      width = 0.4,          -- fraction of columns (<=1) or absolute columns (>1)
-      height = 0.9,         -- fraction of lines (<=1) or absolute lines (>1)
-      opacity = 0.8,        -- 0..1; lower = more see-through (via 'winblend')
-      margin = 2,           -- columns of gap from the screen edge (right/left)
-    },
   },
   -- Where conversation history is stored. nil = stdpath("data")/ami
   -- (outside your repos). Set to a path to override, or "" to use each project's
@@ -72,12 +45,12 @@ M.defaults = {
   },
   -- Extensions: optional capabilities that hook ami's lifecycle. Each entry is an
   -- extension spec table or a module name to require() (e.g. an installed
-  -- ami-*.nvim repo). See docs/extensions.md. ami core ships no active extensions.
+  -- ami-*.nvim repo). See docs/extensions.md. ami core ships no active extensions;
+  -- chat lives in ami-chat.nvim, inline in ami-inline.nvim. An extension's own
+  -- options live under its name (e.g. chat = { ui = {...} }, inline = {...}).
   extensions = {},
   -- Names of extensions to skip registering (e.g. a built-in you don't want).
   disable_extensions = {},
-  -- Inline completion moved to its own repo, ami-inline.nvim. Install it and add
-  -- require("ami-inline") to `extensions`; its options live under `inline` here.
 }
 
 ---@type AmiConfig
@@ -88,15 +61,6 @@ M.options = vim.deepcopy(M.defaults)
 function M.setup(opts)
   opts = opts or {}
   M.options = vim.tbl_deep_extend("force", vim.deepcopy(M.defaults), opts)
-
-  -- Back-compat: the old top-level `chat_model` is now `chat.model`.
-  if opts.chat_model and not (opts.chat and opts.chat.model) then
-    M.options.chat.model = opts.chat_model
-    vim.schedule(function()
-      vim.notify("ami: `chat_model` is deprecated — use `chat = { model = ... }`", vim.log.levels.WARN)
-    end)
-  end
-
   return M.options
 end
 

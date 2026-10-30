@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.8.0).** It works and is covered by tests,
+> ⚠️ **Status: early / experimental (v0.9.0).** It works and is covered by tests,
 > but it hasn't been battle-tested in day-to-day interactive use — expect sharp
 > edges, and pin a commit if you depend on it. Feedback and issues welcome.
 
@@ -20,18 +20,18 @@ thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic
 
 - **Chat advisor panel** — a floating transcript + prompt. Discuss your thinking
   and get streamed, advice-only feedback grounded in your open file, selection,
-  `README.md`/`PLAN.md`, and — via LSP — the files your code depends on.
+  `README.md`/`PLAN.md`, and — via LSP — the files your code depends on. Plus a
+  **branching history tree** (branch/switch/summarize). Ships as the
+  [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) extension; its panel is
+  swappable (e.g. a split layout via
+  [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)).
 - **Inline completion** — native Copilot-style FIM ghost text, manual by default
   (or debounced auto). Accept/dismiss; nothing is written until you accept. Ships
   as the [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) extension.
-- **Branching history tree** — every message is a node; branch from any point and
-  switch between branches. Summarize an old branch to shrink context
-  non-destructively.
-- **Extensions** — a small core with a lifecycle + capability + model-registry API,
-  so optional features live as self-contained extensions (in your config or their
-  own repo). Inline completion and proactive suggestions are the reference ones
-  ([`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim),
-  [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)).
+- **A small runtime core** with a lifecycle + capability + model-registry API, so
+  every feature is a self-contained extension (in your config or its own repo).
+  Core is just the daemon, context engine, model registry, and extension system;
+  chat, inline, and proactive suggestions are first-party extensions.
 - **Runtime model registry** — a default model every feature inherits; each feature
   is a *slot* you can point at any model LM Studio has loaded, via `:AmiModel`.
 - **Managed daemon** — started/stopped with Neovim, reference-counted so it's
@@ -52,26 +52,35 @@ thin client. Everything speaks the OpenAI-compatible API, so it's model-agnostic
 
 With [lazy.nvim](https://github.com/folke/lazy.nvim):
 
+ami core is a runtime; install the feature extensions you want alongside it:
+
 ```lua
 {
   "moosch/ami.nvim",
   build = "make build",        -- compiles the Go daemon (amid)
   dependencies = {
-    "moosch/ami-inline.nvim",          -- inline (FIM) completion (optional)
-    -- "moosch/ami-custom-proactive.nvim", -- proactive suggestions (optional)
+    "moosch/ami-chat.nvim",              -- chat advisor panel + history tree
+    "moosch/ami-inline.nvim",            -- inline (FIM) completion
+    -- "moosch/ami-chat-split.nvim",        -- optional: split-window chat UI
+    -- "moosch/ami-custom-proactive.nvim",  -- optional: proactive suggestions
   },
   config = function()
     require("ami").setup({
       -- point the daemon at your LM Studio if it isn't on localhost:
       -- model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
-      extensions = { require("ami-inline") },
+      extensions = {
+        require("ami-chat"),
+        require("ami-inline"),
+      },
     })
   end,
 }
 ```
 
 The `build` step compiles `amid`. If you skip it, the plugin auto-builds the
-binary on first run when `go` is available.
+binary on first run when `go` is available. Without any feature extensions, core
+alone just manages the daemon and model registry — install `ami-chat.nvim` for the
+chat panel.
 
 ## Quick start
 
@@ -102,31 +111,27 @@ Runtime model selector — swap chat/FIM models on the fly:
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `:AmiChat` | Toggle the chat panel (prompt: `<CR>` normal-mode = send, `<C-n>` new session, `q`/`<Esc>` hide) |
-| `:AmiAsk {text}` | One-shot question; visual mode sends the selection + its deps |
-| `:AmiNewSession [name]` | Start a fresh conversation |
-| `:AmiTree` | Conversation tree — branch/switch/summarize |
-| `:AmiModel [slot]` | Pick a model for a registered slot (no arg = choose which) |
-| `:AmiModels` | Show each model slot's current model |
-| `:AmiExtensions` | List the loaded extensions |
-| `:AmiDaemon [start\|stop\|restart]` | Control the managed daemon |
-| `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Status / log viewer / verbose logging |
+Core itself provides only a few commands; features add their own.
 
-Extensions add their own commands — e.g.
-[`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) adds `:AmiComplete`
-and `:AmiInlineAuto` (insert-mode keys, configurable: `<C-g>` request, `<Tab>`
-accept, `<C-]>` dismiss), and
-[`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
-adds `:AmiProactive` and `:AmiNudge`.
+| Command | What it does | From |
+| --- | --- | --- |
+| `:AmiModel [slot]` | Pick a model for a registered slot (no arg = choose which) | core |
+| `:AmiModels` | Show each model slot's current model | core |
+| `:AmiExtensions` | List the loaded extensions | core |
+| `:AmiDaemon [start\|stop\|restart]` | Control the managed daemon | core |
+| `:AmiHealth` / `:AmiLog` / `:AmiDebug` | Status / log viewer / verbose logging | core |
+| `:AmiChat` | Toggle the chat panel (`<CR>` normal = send, `<C-n>` new, `q`/`<Esc>` hide) | ami-chat |
+| `:AmiAsk {text}` | One-shot question; visual mode sends the selection + its deps | ami-chat |
+| `:AmiNewSession [name]` | Start a fresh conversation | ami-chat |
+| `:AmiTree` | Conversation tree — branch/switch/summarize | ami-chat |
+| `:AmiComplete` / `:AmiInlineAuto` | Request a completion / toggle auto-trigger | ami-inline |
+| `:AmiProactive` / `:AmiNudge` | Toggle proactive / request a suggestion now | ami-custom-proactive |
 
-**Comment-driven completion** works like the original Copilot: write a comment
-describing what you want, put the cursor on the line below it, and press `<C-g>` —
-the comment is part of the FIM prefix, so the model completes the function. (Code
-*after* the cursor is sent as the FIM suffix too, so it fills in context-aware.)
-Set `inline.auto = true` for debounced ghost text as you type instead of on
-keypress.
+Inline keys (from `ami-inline`, configurable): `<C-g>` request, `<Tab>` accept
+(falls back to a real Tab when none shown), `<C-]>` dismiss. **Comment-driven
+completion** works like the original Copilot — write a comment, put the cursor on
+the line below, and trigger; the comment is the FIM prefix and code after the cursor
+is the suffix, so it fills in context-aware.
 
 ## Configuration
 
@@ -139,38 +144,24 @@ require("ami").setup({
   -- model slot (chat, and any extension's) falls back to. Pick per slot live
   -- with :AmiModel.
   model = { endpoint = "http://localhost:1234/v1", model = "qwen3-coder" },
-  -- Chat/advisor provider. Omit endpoint/model to inherit the default `model`
-  -- slot above; set them to point chat at a different provider/model.
-  chat = {
-    -- endpoint = "http://localhost:1234/v1",
-    -- model = "qwen3-coder",
-    ui = {
-      position = "right",          -- "right" | "left" | "center"
-      width = 0.4,                 -- fraction of columns (<=1) or absolute cols (>1)
-      height = 0.9,                -- fraction of lines   (<=1) or absolute lines (>1)
-      opacity = 0.8,               -- 0..1; lower = more see-through (via 'winblend')
-      margin = 2,                  -- columns of gap from the screen edge
-    },
-  },
   session_dir = nil,               -- nil = stdpath("data")/ami (out of your repos)
                                    --  "" = each project's ./.ami/sessions
   daemon = { auto_start = true, auto_build = true, bin = nil },
   context = { lsp_deps = true, dep_max_files = 5, dep_timeout_ms = 1500, dep_max_positions = 30 },
-  -- Optional capabilities live in extensions (their own repos); each registers its
-  -- own config, commands, and model slot. See the Extensions section.
-  extensions = {
-    -- require("ami-inline"),           -- inline (FIM) completion
-    -- require("ami-custom-proactive"), -- proactive suggestions
-  },
+  -- Features live in extensions (their own repos); each registers its own config,
+  -- commands, and model slot. Their options go under their own key, e.g.:
+  extensions = { require("ami-chat"), require("ami-inline") },
+  -- chat   = { ui = { position = "right", opacity = 0.8, ... } },  -- ami-chat
+  -- inline = { auto = true, model = "deepseek-coder-6.7b-instruct" }, -- ami-inline
 })
 ```
 
-**Models are a registry.** Core owns the default `model` slot; chat — and any
-extension that uses a model — is a *slot* that either overrides it or inherits it.
-`:AmiModel` lists every registered slot (`default`, `chat`, plus e.g. `fim` once
-`ami-inline` is installed, `proactive` with `ami-custom-proactive`) and lets you
-pick a model for one from that slot's provider; `:AmiModels` shows the current
-picks. An extension's options live under its own key (e.g. `inline = { ... }`).
+**Models are a registry.** Core owns the default `model` slot; every feature — chat,
+inline, proactive — registers a *slot* that overrides it or inherits it. `:AmiModel`
+lists every registered slot (`default`, plus `chat`/`fim`/`proactive` as their
+extensions load) and lets you pick a model for one from that slot's provider;
+`:AmiModels` shows the current picks. An extension's own options live under its key
+(e.g. `chat = { ui = ... }`, `inline = { ... }`) — see each extension's README.
 
 The daemon also reads these environment variables (the plugin sets them from the
 config above — `AMI_LMSTUDIO_URL`/`AMI_CHAT_MODEL` come from the effective chat
@@ -187,16 +178,16 @@ your global gitignore if you do).
 
 ## Extensions
 
-ami keeps a small core and moves optional features into **extensions** —
-self-contained Lua specs that hook the lifecycle (`context_assembled`,
-`chat_turn_pre/post`, `buf_write`, …), register commands, a **model slot**, or a
-**UI surface** (like the chat panel), all through a stable API rather than core
-internals. Register them in `setup()`:
+ami core is a **runtime**; every feature is an **extension** — a self-contained Lua
+spec that hooks the lifecycle (`context_assembled`, `chat_turn_pre/post`,
+`buf_write`, …), registers commands, a **model slot**, a **capability** (like `chat`
+itself), or a **UI surface** (like the chat panel), all through a stable API rather
+than core internals. Register them in `setup()`:
 
 ```lua
 require("ami").setup({
   extensions = {
-    require("ami-inline"),             -- a spec table
+    require("ami-chat"),               -- a spec table
     "my-org.ami-notes",                -- or a module name to require()
   },
   -- disable_extensions = { "inline" },
@@ -205,17 +196,19 @@ require("ami").setup({
 
 ami ships **no active extensions** itself. First-party ones, each in their own repo:
 
+- [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) — the chat advisor
+  panel + history tree; provides the `chat` capability and a `chat` model slot.
 - [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) — inline (FIM)
   completion; registers a `fim` model slot.
 - [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim) —
   proactive suggestions; registers a `proactive` model slot.
 - [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) — a
-  split-window chat UI (a `chat_ui` provider).
+  split-window chat UI (a `chat_ui` provider that replaces ami-chat's panel).
 
 `:AmiExtensions` lists what's loaded. Writing your own (including publishing it as
 its own `ami-*.nvim` repo) is documented in
 [`docs/extensions.md`](docs/extensions.md), with the full API, events, the model
-registry, the `chat_ui` contract, and the roadmap.
+registry, the `chat`/`chat_ui` contracts, and the roadmap.
 
 ## How it works
 

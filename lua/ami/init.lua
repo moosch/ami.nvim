@@ -1,11 +1,10 @@
--- ami: an IDE-resident AI pair programmer for Neovim (advisor, not actor).
+-- ami: a small runtime for an IDE-resident AI pair programmer (advisor, not actor).
 --
--- Stage 1 provides the chat advisor panel (see ami.chat). The Stage 0
--- health check and echo-stream transport probe are retained for debugging.
+-- Core is a runtime: daemon lifecycle, LLM client, context assembly, the model
+-- registry, the event bus, and the extension system. User-facing features are
+-- extensions — chat lives in ami-chat.nvim, inline in ami-inline.nvim.
 local config = require("ami.config")
 local client = require("ami.client")
-local chat = require("ami.chat")
-local tree = require("ami.tree")
 local models = require("ami.models")
 local daemon = require("ami.daemon")
 local events = require("ami.events")
@@ -13,9 +12,7 @@ local extensions = require("ami.extensions")
 
 local M = {}
 
--- Re-export sub-APIs: require("ami").chat.toggle(), .tree.open() etc.
-M.chat = chat
-M.tree = tree
+-- Re-export sub-APIs: require("ami").models, .daemon, .extensions, .events.
 M.models = models
 M.daemon = daemon
 M.events = events
@@ -33,27 +30,6 @@ function M.register_commands()
     require("ami").echo(opts.args)
   end, { nargs = "+", desc = "Stream text back from the daemon (transport test)" })
 
-  vim.api.nvim_create_user_command("AmiChat", function()
-    require("ami.chat").toggle()
-  end, { desc = "Toggle the advisor prompt (shows the chat panel)" })
-
-  vim.api.nvim_create_user_command("AmiAsk", function(opts)
-    local chat = require("ami.chat")
-    local selection, range = nil, nil
-    if opts.range > 0 then
-      selection = require("ami.context").last_selection()
-      range = { opts.line1, opts.line2 }
-    end
-    chat.ask(opts.args, selection, range)
-  end, { nargs = "+", range = true, desc = "Ask the advisor (visual range sends the selection + its deps)" })
-
-  vim.api.nvim_create_user_command("AmiNewSession", function(opts)
-    require("ami.chat").new_session(opts.args)
-  end, { nargs = "?", desc = "Start a fresh advisor session" })
-
-  vim.api.nvim_create_user_command("AmiTree", function()
-    require("ami.tree").open(false)
-  end, { desc = "Open the conversation tree (branch/switch/summarize)" })
 
   vim.api.nvim_create_user_command("AmiModel", function(opts)
     local m = require("ami.models")
@@ -139,7 +115,7 @@ function M.health()
 end
 
 -- Open (or reuse) a throwaway scratch buffer in a split for streamed output.
--- Stage 1 replaces this with the real chat panel in ami.chat.
+-- Used only by :AmiEcho, the transport probe (the chat UI lives in ami-chat.nvim).
 local scratch_buf = nil
 local function scratch_window()
   if not (scratch_buf and vim.api.nvim_buf_is_valid(scratch_buf)) then

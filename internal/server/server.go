@@ -22,7 +22,7 @@ import (
 
 // Version is the daemon version, surfaced on /health so the plugin can detect a
 // stale binary. Bump it on release.
-const Version = "0.8.0"
+const Version = "0.9.0"
 
 // Server wires the daemon's dependencies to its HTTP handlers.
 type Server struct {

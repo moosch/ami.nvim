@@ -5,9 +5,12 @@ self-contained Lua tables that hook into the agent's lifecycle through a stable
 API, instead of reaching into core internals. An extension can live in this repo
 or — more usefully — in its own Neovim plugin repo that returns a spec.
 
-Reference extensions, each in its own repo:
+ami core is a runtime; every feature is an extension. Reference extensions, each in
+its own repo:
+[`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) (the chat panel + tree —
+provides the `chat` capability and a model slot),
 [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) (inline/FIM
-completion — registers a model slot),
+completion — a model slot),
 [`ami-custom-proactive.nvim`](https://github.com/moosch/ami-custom-proactive.nvim)
 (proactive suggestions — events, commands, daemon calls, a model slot), and
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
@@ -65,9 +68,11 @@ User config for an extension lives under its `name`
 | `api.log` | ami's logger (`.debug/.info/.warn/.error`) |
 | `api.notify(msg, level?)` | `vim.notify` prefixed with `ami:` |
 | `api.on(event, fn)` | subscribe to a lifecycle event; returns an unsubscribe fn |
+| `api.emit(event, ...)` | emit a lifecycle event (e.g. a chat extension emits `chat_turn_pre/post`) |
 | `api.command(name, spec)` | register a `:Name` command (`{desc,nargs,range,complete,fn}`) |
 | `api.provide(cap, impl)` | offer a provider for a named capability (see below) |
-| `api.chat` | `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()` |
+| `api.resolve(cap)` | look up a capability provider (or nil) |
+| `api.chat` | proxies the `chat` capability (from a chat extension; no-ops if none): `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()` |
 | `api.client` | `stream(path, body, cbs)`, `post_json(path, body, cb, opts)` — talk to the daemon |
 | `api.context` | `gather_async(bufnr, win, selection, range, cb)`, `project_root(bufnr)` |
 | `api.models` | `register(slot)`, `default()`, `effective(name)` — the model registry (below) |
@@ -91,12 +96,21 @@ logged and the rest still run.
 core or another extension looks it up with `require("ami.extensions").resolve(cap)`.
 This is how UI surfaces become swappable.
 
+### `chat` — the chat panel itself
+
+Chat is an extension ([`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim)): it
+`provide`s the `chat` capability — a controller exposing `toggle`, `open`, `close`,
+`append`, `add_proactive`, `session()`, `source()`, `set_source()`, `is_streaming()`
+and more. Core's `api.chat` proxies to it, so other extensions (e.g. proactive)
+reach the panel without depending on ami-chat directly; the calls are safe no-ops if
+no chat extension is loaded.
+
 ### `chat_ui` — replace the chat panel
 
-The chat **controller** (`ami.chat`) owns the session, streaming, and events but
-draws nothing itself: it drives whatever `chat_ui` provider is registered, falling
-back to the built-in floating panel (`ami.chat_ui`). Register your own to replace
-the panel entirely — e.g. a sidebar split, a bottom dock, or a custom transcript:
+The chat **controller** (in `ami-chat.nvim`) owns the session, streaming, and events
+but draws nothing itself: it drives whatever `chat_ui` provider is registered,
+falling back to its bundled floating panel. Register your own to replace the panel
+entirely — e.g. a sidebar split, a bottom dock, or a custom transcript:
 
 ```lua
 setup = function(api)
@@ -120,8 +134,8 @@ end
 | `clear_input()` | clear the draft |
 
 Implement every method — the controller assumes the whole contract and does not
-mix a custom renderer with the built-in (they wouldn't share buffers). Use
-`ami.chat_ui` (floating panel) as the reference implementation, or
+mix a custom renderer with the bundled one (they wouldn't share buffers). Use
+ami-chat's bundled `lua/ami-chat/ui.lua` (floating panel) as the reference, or
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) for a
 split-window `chat_ui` packaged as its own repo.
 
@@ -175,19 +189,17 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **Chat as an extension** (`ami-chat.nvim`): move the chat controller out of core
-   so core is a pure runtime; it would register the `chat` model slot (which core
-   does today) with no API change.
-2. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
+1. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
    Doable via `chat_turn_pre` once the daemon accepts an optional `instructions`
    field and merges it into the system prompt (`internal/prompt/system.go`).
-3. **Context-provider extensions** via `context_assembled`: git diff/blame,
+2. **Context-provider extensions** via `context_assembled`: git diff/blame,
    test/build output, LSP diagnostics, a project-conventions file.
-4. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
+3. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
    likely an out-of-process HTTP protocol for context/prompt middleware.
-5. **rtp auto-discovery** of installed extensions, and **project-local
+4. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
 
-**Done:** the `chat_ui` capability (swappable chat panel); the model registry +
-generic selector; inline completion (`ami-inline.nvim`) and the packaging
-convention (`ami-*.nvim` repos exposing a spec).
+**Done:** core is now a pure runtime — chat (`ami-chat.nvim`), inline
+(`ami-inline.nvim`), and proactive are all extensions; the `chat`/`chat_ui`
+capabilities (swappable panel), the model registry + generic selector, and the
+packaging convention (`ami-*.nvim` repos exposing a spec).

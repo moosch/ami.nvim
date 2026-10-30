@@ -102,8 +102,8 @@ local function make_api(spec)
     })
   end
 
-  --- Offer an implementation for a named capability (e.g. "chat_ui"). Core, or
-  --- another extension, can look it up with extensions.resolve(cap).
+  --- Offer an implementation for a named capability (e.g. "chat", "chat_ui").
+  --- Core, or another extension, looks it up with api.resolve / extensions.resolve.
   function api.provide(cap, impl)
     if providers[cap] then
       log.warn(("extensions: '%s' overrides the existing provider for '%s'"):format(spec.name, cap))
@@ -111,33 +111,53 @@ local function make_api(spec)
     providers[cap] = impl
   end
 
-  -- Curated access to the chat panel.
+  --- Look up a capability provider (or nil).
+  function api.resolve(cap)
+    return M.resolve(cap)
+  end
+
+  --- Emit a lifecycle event (e.g. a chat extension emits chat_turn_pre/post).
+  function api.emit(event, ...)
+    return require("ami.events").emit(event, ...)
+  end
+
+  -- Curated access to chat, which is itself a capability provided by a chat
+  -- extension (e.g. ami-chat.nvim). These proxy to whatever registered "chat";
+  -- they are safe no-ops when no chat extension is loaded.
+  local function chat_cap()
+    return M.resolve("chat")
+  end
   api.chat = {
     add_proactive = function(text)
-      require("ami.chat").add_proactive(text)
+      local c = chat_cap()
+      if c then c.add_proactive(text) end
     end,
     append = function(text)
-      require("ami.chat").append(text)
+      local c = chat_cap()
+      if c then c.append(text) end
     end,
     open = function()
-      require("ami.chat").open()
+      local c = chat_cap()
+      if c then c.open() end
     end,
     session = function()
-      return require("ami.chat").session_id
+      local c = chat_cap()
+      return c and c.session() or "default"
     end,
     model = function()
-      return (require("ami.config").options.chat or {}).model
+      return require("ami.models").effective("chat").model
     end,
     source = function()
-      local c = require("ami.chat")
-      return c.source_buf, c.source_win
+      local c = chat_cap()
+      if c then return c.source() end
     end,
     set_source = function(buf, win)
-      local c = require("ami.chat")
-      c.source_buf, c.source_win = buf, win
+      local c = chat_cap()
+      if c then c.set_source(buf, win) end
     end,
     is_streaming = function()
-      return require("ami.chat").streaming == true
+      local c = chat_cap()
+      return c and c.is_streaming() or false
     end,
   }
 
@@ -158,6 +178,9 @@ local function make_api(spec)
     end,
     project_root = function(...)
       return require("ami.context").project_root(...)
+    end,
+    last_selection = function(...)
+      return require("ami.context").last_selection(...)
     end,
   }
 

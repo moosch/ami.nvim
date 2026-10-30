@@ -7,9 +7,11 @@
 --   AMI_FIM_MODEL=qwen3-coder nvim -u demos/init.lua demo.go
 local root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":h:h")
 vim.opt.runtimepath:append(root)
--- Inline completion now lives in its own repo; append the sibling checkout so the
--- inline demo can load it. (Installed via a plugin manager in real use.)
-vim.opt.runtimepath:append(vim.fn.fnamemodify(root, ":h") .. "/ami-inline.nvim")
+-- Chat and inline now live in their own repos; append the sibling checkouts so the
+-- demos can load them. (Installed via a plugin manager in real use.)
+local parent = vim.fn.fnamemodify(root, ":h")
+vim.opt.runtimepath:append(parent .. "/ami-chat.nvim")
+vim.opt.runtimepath:append(parent .. "/ami-inline.nvim")
 
 vim.o.termguicolors = true
 vim.o.number = true
@@ -20,11 +22,13 @@ vim.o.swapfile = false
 
 local endpoint = os.getenv("AMI_ENDPOINT") or "http://localhost:1234/v1"
 
--- Load the inline extension if its repo is on the runtimepath.
+-- Load the chat + inline extensions if their repos are on the runtimepath.
 local extensions = {}
-local ok, inline = pcall(require, "ami-inline")
-if ok then
-  extensions[#extensions + 1] = inline
+for _, mod in ipairs({ "ami-chat", "ami-inline" }) do
+  local ok, ext = pcall(require, mod)
+  if ok then
+    extensions[#extensions + 1] = ext
+  end
 end
 
 require("ami").setup({

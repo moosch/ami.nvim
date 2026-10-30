@@ -131,7 +131,8 @@ function M.show()
   vim.notify("ami models — " .. body, vim.log.levels.INFO)
 end
 
---- Register the core slots: the default provider, and chat (still core).
+--- Register the core default model slot. Features (including chat, via
+--- ami-chat.nvim) register their own slots on top of this.
 function M.setup()
   M.register({
     name = "default",
@@ -141,16 +142,6 @@ function M.setup()
     set = function(m)
       config.options.model = config.options.model or {}
       config.options.model.model = m
-    end,
-  })
-  M.register({
-    name = "chat",
-    label = "Chat / advisor",
-    endpoint = function() return (config.options.chat or {}).endpoint end,
-    get = function() return (config.options.chat or {}).model end,
-    set = function(m)
-      config.options.chat = config.options.chat or {}
-      config.options.chat.model = m
     end,
   })
 end

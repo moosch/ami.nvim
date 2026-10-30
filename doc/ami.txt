@@ -61,22 +61,10 @@ the managed daemon (unless `daemon.auto_start = false`). See
 ==============================================================================
 5. COMMANDS                                                   *ami-commands*
 
-                                                                  *:AmiChat*
-:AmiChat          Toggle the chat panel (floating transcript + prompt).
-                      In the prompt: <CR> (normal mode) sends, <C-n> new
-                      session, q / <Esc> hides it (draft preserved).
-
-                                                                   *:AmiAsk*
-:AmiAsk {text}    One-shot question. In visual mode also sends the
-                      selection (and its LSP dependencies) as context.
-
-                                                            *:AmiNewSession*
-:AmiNewSession [name]
-                      Start a fresh conversation.
-
-                                                                  *:AmiTree*
-:AmiTree          Open the conversation tree: branch, switch branches, and
-                      summarize. Keys: <CR> switch, s summarize, r refresh, q.
+Core provides the model/daemon/extension commands below. Feature commands come
+from extensions: ami-chat.nvim adds :AmiChat, :AmiAsk, :AmiNewSession, :AmiTree;
+ami-inline.nvim adds :AmiComplete, :AmiInlineAuto; ami-custom-proactive.nvim adds
+:AmiProactive, :AmiNudge. See |ami-extensions|.
 
                                                                  *:AmiModel*
 :AmiModel [slot]
@@ -113,15 +101,6 @@ Defaults (pass overrides to |ami.setup()|): >
         endpoint = "http://localhost:1234/v1",
         model = "qwen3-coder",      -- pick per slot live with :AmiModel
       },
-      chat = {                      -- chat/advisor provider (via the daemon)
-        -- endpoint, model          -- omit to inherit the default `model` slot
-        ui = {                      -- chat panel placement/appearance
-          position = "right",       -- "right" | "left" | "center"
-          width = 0.4, height = 0.9,-- fraction of screen (<=1) or absolute cells
-          opacity = 0.8,            -- 0..1; lower = more see-through ('winblend')
-          margin = 2,               -- gap in columns from the screen edge
-        },
-      },
       session_dir = nil,            -- nil = stdpath("data")/ami
                                     --  ""  = each project's ./.ami/sessions
       daemon = {
@@ -131,34 +110,40 @@ Defaults (pass overrides to |ami.setup()|): >
         lsp_deps = true, dep_max_files = 5,
         dep_timeout_ms = 1500, dep_max_positions = 30,
       },
-      extensions = {},          -- extension specs or module names to register
+      extensions = {            -- feature extensions (their own repos)
+        require("ami-chat"), require("ami-inline"),
+      },
       disable_extensions = {},  -- names of extensions to skip
     })
 <
-Inline completion is the ami-inline.nvim extension; install it and add
-require("ami-inline") to `extensions`. An extension's own options live under its
-name (e.g. `inline = { ... }`, `proactive = { ... }`). See |ami-extensions|.
+Chat lives in ami-chat.nvim and inline in ami-inline.nvim; install them and add
+require("ami-chat") / require("ami-inline") to `extensions`. An extension's own
+options live under its name (e.g. `chat = { ui = {...} }`, `inline = { ... }`).
+See |ami-extensions|.
 ==============================================================================
 7. EXTENSIONS                                             *ami-extensions*
 
-ami keeps a small core; optional features are extensions — self-contained Lua
-specs that hook the lifecycle through a stable API instead of core internals.
-Register specs, or module names to require(), in |ami.setup()|: >
+ami core is a runtime; every feature is an extension — a self-contained Lua spec
+that hooks the lifecycle, registers commands / a model slot / a capability, all
+through a stable API instead of core internals. Register specs, or module names
+to require(), in |ami.setup()|: >
     require("ami").setup({
       extensions = {
-        require("ami-custom-proactive"),  -- a spec table
+        require("ami-chat"), require("ami-inline"),
         "my-org.ami-notes",               -- or a module name to require()
       },
-      -- disable_extensions = { "proactive" },
+      -- disable_extensions = { "inline" },
     })
 <
-ami ships no active extensions itself. Proactive suggestions (formerly built in)
-now live in the ami-custom-proactive.nvim repo. `:AmiExtensions` lists what is
-loaded. Lifecycle events: setup, context_assembled, chat_turn_pre,
+ami ships no active extensions itself. First-party ones (each its own repo):
+ami-chat.nvim (chat panel + tree; provides the "chat" capability), ami-inline.nvim
+(inline/FIM completion), ami-custom-proactive.nvim (proactive suggestions),
+ami-chat-split.nvim (a split-window "chat_ui" provider). `:AmiExtensions` lists
+what is loaded. Lifecycle events: setup, context_assembled, chat_turn_pre,
 chat_turn_post, buf_write.
 
-Full API, event reference, and a guide to writing/publishing your own are in
-docs/extensions.md in the repository.
+Full API, event reference, model registry, the chat/chat_ui contracts, and a guide
+to writing/publishing your own are in docs/extensions.md in the repository.
 
 ==============================================================================
 8. HOW IT WORKS                                           *ami-architecture*

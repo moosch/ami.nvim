@@ -50,19 +50,26 @@ function M.check()
     h.info("daemon not running yet — it starts on setup()")
   end
 
-  -- Check each configured provider (chat and inline may differ), de-duplicated.
+  -- Check each registered model slot's provider endpoint, de-duplicated.
+  local models = require("ami.models")
   local checked = {}
-  for _, p in ipairs({
-    { label = "chat", ep = (cfg.chat or {}).endpoint or "" },
-    { label = "inline", ep = (cfg.inline or {}).endpoint or "" },
-  }) do
-    if p.ep ~= "" and not checked[p.ep] then
-      checked[p.ep] = true
-      if sync_get(p.ep .. "/models") then
-        h.ok(("%s provider reachable at %s"):format(p.label, p.ep))
+  local function check_ep(label, ep)
+    ep = ep or ""
+    if ep ~= "" and not checked[ep] then
+      checked[ep] = true
+      if sync_get(ep .. "/models") then
+        h.ok(("%s provider reachable at %s"):format(label, ep))
       else
-        h.error(("%s provider not reachable at %s — start it or fix the endpoint"):format(p.label, p.ep))
+        h.error(("%s provider not reachable at %s — start it or fix the endpoint"):format(label, ep))
       end
+    end
+  end
+  local names = models.slot_names()
+  if #names == 0 then
+    check_ep("default", (cfg.model or {}).endpoint)
+  else
+    for _, name in ipairs(names) do
+      check_ep(name, models.effective(name).endpoint)
     end
   end
 end
