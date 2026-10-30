@@ -79,13 +79,43 @@ User config for an extension lives under its `name`
 Handlers run in registration order, each under `pcall` — a throwing handler is
 logged and the rest still run.
 
-## Capability providers (UI and beyond)
+## Capability providers (swappable UI)
 
 `api.provide(cap, impl)` registers an implementation for a named capability;
 core or another extension looks it up with `require("ami.extensions").resolve(cap)`.
-This is how UI surfaces become swappable. `"chat_ui"` is **reserved** as the first
-UI capability (see the roadmap) — the mechanism ships now; routing the chat panel
-through it is the next step.
+This is how UI surfaces become swappable.
+
+### `chat_ui` — replace the chat panel
+
+The chat **controller** (`ami.chat`) owns the session, streaming, and events but
+draws nothing itself: it drives whatever `chat_ui` provider is registered, falling
+back to the built-in floating panel (`ami.chat_ui`). Register your own to replace
+the panel entirely — e.g. a sidebar split, a bottom dock, or a custom transcript:
+
+```lua
+setup = function(api)
+  api.provide("chat_ui", my_renderer)
+end
+```
+
+`my_renderer` must implement the full contract:
+
+| Method | Contract |
+| --- | --- |
+| `open(ctl)` | show the full interactive panel and focus the input. `ctl = { submit, new_session, close }` — wire these to your keymaps |
+| `show()` | ensure the transcript is visible **without** stealing focus |
+| `close()` | hide the panel; **must preserve** the transcript contents and any draft |
+| `is_open()` | `true` if the panel (transcript or input) is currently visible |
+| `owns_buf(bufnr)` | `true` if `bufnr` is one of the panel's own buffers (so the controller won't treat it as the source file) |
+| `append(text)` | append text (may contain `\n`) to the transcript; pin to the bottom; must work even when hidden |
+| `clear()` | empty the transcript |
+| `set_status(text)` | show a transient status line; `set_status(nil)` clears it |
+| `read_input()` | return the current draft text |
+| `clear_input()` | clear the draft |
+
+Implement every method — the controller assumes the whole contract and does not
+mix a custom renderer with the built-in (they wouldn't share buffers). Use
+`ami.chat_ui` as the reference implementation.
 
 ## Publishing as its own repo
 
@@ -109,21 +139,18 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **Chat UI as a swappable `chat_ui` renderer** — the flagship UI extension.
-   Define the renderer interface (`open`/`close`/`append`/`render_nodes`/
-   `add_proactive`/`status`) and route `ami.chat` through `resolve("chat_ui")`,
-   falling back to the built-in floating panel. Would let an extension replace the
-   panel's layout entirely (e.g. a sidebar split).
-2. **Inline completion** as an extension.
-3. **Model selector** as an extension.
-4. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
+1. **Inline completion** as an extension.
+2. **Model selector** as an extension.
+3. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
    Doable via `chat_turn_pre` once the daemon accepts an optional `instructions`
    field and merges it into the system prompt (`internal/prompt/system.go`).
-5. **Context-provider extensions** via `context_assembled`: git diff/blame,
+4. **Context-provider extensions** via `context_assembled`: git diff/blame,
    test/build output, LSP diagnostics, a project-conventions file.
-6. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
+5. **Daemon-side provider protocol** (investigate): Go can't hot-load plugins, so
    likely an out-of-process HTTP protocol for context/prompt middleware.
-7. **rtp auto-discovery** of installed extensions, and **project-local
+6. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
-8. **Packaging convention**: extensions as their own `ami-*.nvim` repos exposing a
+7. **Packaging convention**: extensions as their own `ami-*.nvim` repos exposing a
    spec (proven by `ami-custom-proactive.nvim`).
+
+**Done:** the `chat_ui` capability (swappable chat panel) — see above.
