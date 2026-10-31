@@ -50,6 +50,21 @@ function M.check()
       check_ep(name, models.effective(name).endpoint)
     end
   end
+
+  -- Extension-contributed health checks (api.health), one section each.
+  for _, c in ipairs(require("ami.extensions").health_checks()) do
+    h.start("extension: " .. c.name)
+    local report = {
+      ok = function(m) h.ok(m) end,
+      warn = function(m) h.warn(m) end,
+      error = function(m) h.error(m) end,
+      info = function(m) h.info(m) end,
+    }
+    local okc, err = pcall(c.fn, report)
+    if not okc then
+      h.error(("'%s' health check errored: %s"):format(c.name, tostring(err)))
+    end
+  end
 end
 
 return M

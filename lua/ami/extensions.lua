@@ -30,6 +30,8 @@ local order = {}
 local disabled = {}
 ---@type table<string, any> capability -> provider impl
 local providers = {}
+---@type table[] { name, fn } health checks contributed by extensions
+local health_checks = {}
 
 --- Mark extensions (by name) to skip at registration. Called by ami.setup().
 ---@param names string[]|nil
@@ -119,6 +121,12 @@ local function make_api(spec)
   --- Emit a lifecycle event (e.g. a chat extension emits chat_turn_pre/post).
   function api.emit(event, ...)
     return require("ami.events").emit(event, ...)
+  end
+
+  --- Contribute a :checkhealth ami section. `fn(report)` receives a reporter with
+  --- ok/warn/error/info; each call renders a line under this extension's heading.
+  function api.health(fn)
+    health_checks[#health_checks + 1] = { name = spec.name, fn = fn }
   end
 
   -- Curated access to chat, which is itself a capability provided by a chat
@@ -251,9 +259,16 @@ function M.resolve(cap)
   return providers[cap]
 end
 
+--- Health checks contributed by extensions, in registration order. Consumed by
+--- the :checkhealth ami handler.
+---@return table[] { name, fn }
+function M.health_checks()
+  return health_checks
+end
+
 --- Reset all registry state. For tests only.
 function M._reset()
-  by_name, order, disabled, providers = {}, {}, {}, {}
+  by_name, order, disabled, providers, health_checks = {}, {}, {}, {}, {}
 end
 
 return M

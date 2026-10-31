@@ -10,7 +10,9 @@ Working through these in order, one at a time.
 - [x] **3. `ami-persona.nvim`** — inject a style/system message via `chat_turn_pre`.
       Done: built-in personas (terse/teacher/reviewer) + user-defined, `:AmiPersona`
       to switch/off, injected as a system message after the advisor prompt.
-- [ ] **5. Extension health hooks** — `api.health(fn)` aggregated into `:checkhealth ami`.
+- [x] **5. Extension health hooks** — `api.health(fn)` aggregated into `:checkhealth ami`.
+      Done: core registry + health.lua renders a section per extension; chat/history/
+      inline/proactive each contribute one.
 - [ ] **4. Context-provider extensions** — git diff / diagnostics / test output via
       `context_assembled`.
 - [ ] **2. Automated test suite + CI** — headless specs for context.assemble, the

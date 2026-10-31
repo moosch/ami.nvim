@@ -73,6 +73,7 @@ User config for an extension lives under its `name`
 | `api.notify(msg, level?)` | `vim.notify` prefixed with `ami:` |
 | `api.on(event, fn)` | subscribe to a lifecycle event; returns an unsubscribe fn |
 | `api.emit(event, ...)` | emit a lifecycle event (e.g. a chat extension emits `chat_turn_pre/post`) |
+| `api.health(fn)` | contribute a `:checkhealth ami` section; `fn(report)` gets `report.ok/warn/error/info` |
 | `api.command(name, spec)` | register a `:Name` command (`{desc,nargs,range,complete,fn}`) |
 | `api.provide(cap, impl)` | offer a provider for a named capability (see below) |
 | `api.resolve(cap)` | look up a capability provider (or nil) |
