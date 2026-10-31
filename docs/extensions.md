@@ -16,8 +16,10 @@ completion — a model slot),
 [`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim)
 (proactive suggestions — events, commands, direct LLM calls, a model slot), and
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
-(a split-window chat UI — a full `chat_ui` provider). A tiny in-tree template
-lives at `lua/ami/extensions/example.lua`.
+(a split-window chat UI — a full `chat_ui` provider), and
+[`ami-persona.nvim`](https://github.com/moosch/ami-persona.nvim)
+(prompt-injection via `chat_turn_pre`). A tiny in-tree template lives at
+`lua/ami/extensions/example.lua`.
 
 ## Registering an extension
 
@@ -218,17 +220,15 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **Persona / prompt-injection** (e.g. "respond to me tersely", a house style).
-   Doable now via a `chat_turn_pre` handler that mutates `req.messages` (e.g.
-   appends a system message), or prepends to the chat system prompt.
-2. **Context-provider extensions** via `context_assembled`: git diff/blame,
+1. **Context-provider extensions** via `context_assembled`: git diff/blame,
    test/build output, LSP diagnostics, a project-conventions file.
-3. **rtp auto-discovery** of installed extensions, and **project-local
+2. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
-4. **Fancier history** providers (semantic search / summarizing memory) against the
+3. **Fancier history** providers (semantic search / summarizing memory) against the
    same `history` capability.
 
 **Done:** core is now a **pure-Lua runtime** (no daemon) — chat (`ami-chat.nvim`),
-history (`ami-history.nvim`), inline (`ami-inline.nvim`), and proactive are all
-extensions; the `chat`/`chat_ui`/`history` capabilities, the chat event pathway, the
-model registry + generic selector, and the `ami-*.nvim` packaging convention.
+history (`ami-history.nvim`), inline (`ami-inline.nvim`), proactive, and persona
+(`ami-persona.nvim`, prompt-injection via `chat_turn_pre`) are all extensions; the
+`chat`/`chat_ui`/`history` capabilities, the chat event pathway, the model registry +
+generic selector, and the `ami-*.nvim` packaging convention.

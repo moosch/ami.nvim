@@ -7,7 +7,9 @@ Working through these in order, one at a time.
       once-only settle guard; a signal-killed curl now routes to on_error. ami-chat
       keeps the in-flight handle, adds `:AmiStop` + `keymaps.stop` (`<C-c>`), and
       cancels on panel close ("[stopped]" shown, not an error).
-- [ ] **3. `ami-persona.nvim`** — inject a style/system message via `chat_turn_pre`.
+- [x] **3. `ami-persona.nvim`** — inject a style/system message via `chat_turn_pre`.
+      Done: built-in personas (terse/teacher/reviewer) + user-defined, `:AmiPersona`
+      to switch/off, injected as a system message after the advisor prompt.
 - [ ] **5. Extension health hooks** — `api.health(fn)` aggregated into `:checkhealth ami`.
 - [ ] **4. Context-provider extensions** — git diff / diagnostics / test output via
       `context_assembled`.
