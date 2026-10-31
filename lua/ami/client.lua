@@ -45,8 +45,11 @@ end
 ---@param endpoint string provider base URL
 ---@param body table { model, messages, temperature?, ... } (stream is forced on)
 ---@param callbacks table { on_token=fun(content), on_done=fun(), on_error=fun(msg) }
+---@param opts table|nil { timeout_ms=number } idle timeout (no new token); default 120000
 ---@return vim.SystemObj handle (supports :kill())
-function M.stream_chat(endpoint, body, callbacks)
+function M.stream_chat(endpoint, body, callbacks, opts)
+  opts = opts or {}
+  local timeout_ms = opts.timeout_ms or 120000
   local on_token = callbacks.on_token or function() end
   local on_done = callbacks.on_done or function() end
   local on_error = callbacks.on_error or function() end
@@ -57,16 +60,50 @@ function M.stream_chat(endpoint, body, callbacks)
   log.info(("stream_chat: POST %s (%d bytes)"):format(url, #payload))
 
   local pending = ""
-  local errored = false
   local tokens = 0
+  local settled, timer, handle = false, nil, nil
+
+  local function stop_timer()
+    if timer then
+      timer:stop()
+      timer = nil
+    end
+  end
+  -- Idle watchdog: if no new token arrives within timeout_ms, give up (covers a
+  -- cold model that never responds, and a mid-stream stall). Reset on each token.
+  local function arm_timer()
+    stop_timer()
+    timer = vim.defer_fn(function()
+      if settled then
+        return
+      end
+      pcall(function()
+        if handle then
+          handle:kill("sigterm")
+        end
+      end)
+      settled = true
+      on_error(("no reply within %ds — is the model loading? raise chat.timeout_ms, or try again once it's warm")
+        :format(math.floor(timeout_ms / 1000)))
+    end, timeout_ms)
+  end
+  local function finish(err)
+    if settled then
+      return
+    end
+    settled = true
+    stop_timer()
+    if err then
+      on_error(err)
+    else
+      on_done()
+    end
+  end
 
   -- Parse one SSE line (OpenAI format: `data: {json}` / `data: [DONE]`).
   local function handle_line(line)
     local data = line:gsub("\r$", ""):match("^data:%s?(.*)$")
-    if not data or data == "" then
-      return
-    end
-    if data == "[DONE]" then
+    if not data or data == "" or data == "[DONE]" then
       return
     end
     local ok, obj = pcall(vim.json.decode, data)
@@ -74,20 +111,20 @@ function M.stream_chat(endpoint, body, callbacks)
       return
     end
     if obj.error then
-      errored = true
       local e = obj.error
-      on_error(type(e) == "table" and (e.message or vim.inspect(e)) or tostring(e))
+      finish(type(e) == "table" and (e.message or vim.inspect(e)) or tostring(e))
       return
     end
     local choice = obj.choices and obj.choices[1]
     local content = choice and choice.delta and choice.delta.content
     if content and content ~= "" then
       tokens = tokens + 1
+      arm_timer() -- saw a token; reset the idle watchdog
       on_token(content)
     end
   end
 
-  return vim.system(
+  handle = vim.system(
     {
       "curl", "-sS", "-N", "-X", "POST",
       "-H", "Content-Type: application/json",
@@ -118,18 +155,21 @@ function M.stream_chat(endpoint, body, callbacks)
           handle_line(pending)
           pending = ""
         end
-        log.debug(("stream_chat: curl exit=%d, tokens=%d"):format(res.code, tokens))
-        if errored then
-          return -- on_error already fired
-        end
-        if res.code ~= 0 then
-          on_error(("curl exit %d: %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
+        local sig = res.signal or 0
+        log.debug(("stream_chat: curl exit=%d signal=%d, tokens=%d"):format(res.code, sig, tokens))
+        if sig ~= 0 then
+          -- Killed (e.g. cancelled or the idle watchdog) — not a normal completion.
+          finish(("interrupted (signal %d)"):format(sig))
+        elseif res.code ~= 0 then
+          finish(("curl exit %d: %s"):format(res.code, (res.stderr or ""):gsub("%s+$", "")))
         else
-          on_done()
+          finish(nil)
         end
       end)
     end
   )
+  arm_timer()
+  return handle
 end
 
 --- POST <endpoint>/completions (non-streaming) and call cb(ok, text|errmsg).
