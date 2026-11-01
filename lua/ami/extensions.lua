@@ -123,6 +123,13 @@ local function make_api(spec)
     return require("ami.events").emit(event, ...)
   end
 
+  --- Emit a collector hook and return each handler's non-nil return (see
+  --- ami.events.emit_collect). For "contribution" points like chat.system /
+  --- context.extra where the caller composes the returned pieces itself.
+  function api.emit_collect(event, ...)
+    return require("ami.events").emit_collect(event, ...)
+  end
+
   --- Contribute a :checkhealth ami section. `fn(report)` receives a reporter with
   --- ok/warn/error/info; each call renders a line under this extension's heading.
   function api.health(fn)

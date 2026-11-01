@@ -55,6 +55,31 @@ function M.emit(event, ...)
   end
 end
 
+--- Emit `event` and collect each handler's non-nil return value into a list, in
+--- registration order. This is the "contribution" variant of emit: a feature
+--- declares a collector hook (e.g. "chat.system", "context.extra") and extensions
+--- register handlers that RETURN a value, which the feature composes itself —
+--- cleaner than everyone mutating a shared payload. Handlers run synchronously, so
+--- keep them fast/pure (precompute async work out-of-band and return it here).
+---@param event string
+---@return any[] contributions
+function M.emit_collect(event, ...)
+  local out = {}
+  local list = handlers[event]
+  if not list then
+    return out
+  end
+  for _, fn in ipairs(list) do
+    local ok, res = pcall(fn, ...)
+    if not ok then
+      log.warn(("events: collector for '%s' errored — %s"):format(event, tostring(res)))
+    elseif res ~= nil then
+      out[#out + 1] = res
+    end
+  end
+  return out
+end
+
 --- Remove all handlers for `event`, or all handlers entirely when `event` is nil.
 --- (Mainly for tests.)
 ---@param event string|nil

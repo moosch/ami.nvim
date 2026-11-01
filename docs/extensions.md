@@ -18,8 +18,10 @@ completion — a model slot),
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim)
 (a split-window chat UI — a full `chat_ui` provider), and
 [`ami-persona.nvim`](https://github.com/moosch/ami-persona.nvim)
-(prompt-injection via `chat_turn_pre`). A tiny in-tree template lives at
-`lua/ami/extensions/example.lua`.
+(a `chat.system` contributor), and
+[`ami-context-git.nvim`](https://github.com/moosch/ami-context-git.nvim)
+(a `context.extra` provider — feeds your uncommitted diff). A tiny in-tree template
+lives at `lua/ami/extensions/example.lua`.
 
 ## Registering an extension
 
@@ -95,6 +97,33 @@ User config for an extension lives under its `name`
 
 Handlers run in registration order, each under `pcall` — a throwing handler is
 logged and the rest still run.
+
+## Collector hooks (contribution points)
+
+Events are fire-and-observe (handlers run for side effects or mutate a shared
+payload). A **collector** is the "contribute a value" variant: a feature declares a
+hook, extensions register handlers that **return** a value, and the feature composes
+the returns itself (`api.emit_collect(name, …)` → list of non-nil returns, in
+registration order). This is cleaner than many extensions mutating one shared table —
+no clobbering, no order-fragility, the feature controls placement.
+
+Collectors are **synchronous** — the feature needs the contributions right now to
+build its request. Keep handlers fast and pure; if you need async data (git, LSP,
+network), precompute it (update state on events) and return that state here.
+
+Declared collector hooks:
+
+| Hook | A handler returns | Composed by |
+| --- | --- | --- |
+| `chat.system` | a system-message string (or nil) | ami-chat appends it after the advisor prompt — used by `ami-persona` |
+| `context.extra` | `{ title, body }` or a string (or nil) | core `context.assemble` adds it as a context section within the token budget — used by `ami-context-git` |
+
+```lua
+-- contribute to the context sent on every turn:
+api.on("context.extra", function(info)       -- info.refs has project_root, active_path, …
+  return { title = "Test output", body = cached_test_output }  -- or nil to add nothing
+end)
+```
 
 ## Capability providers
 
@@ -221,15 +250,15 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **Context-provider extensions** via `context_assembled`: git diff/blame,
-   test/build output, LSP diagnostics, a project-conventions file.
+1. **More context providers** on `context.extra`: LSP diagnostics, test/build
+   output, a project-conventions file (git diff shipped in `ami-context-git.nvim`).
 2. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
 3. **Fancier history** providers (semantic search / summarizing memory) against the
    same `history` capability.
 
 **Done:** core is now a **pure-Lua runtime** (no daemon) — chat (`ami-chat.nvim`),
-history (`ami-history.nvim`), inline (`ami-inline.nvim`), proactive, and persona
-(`ami-persona.nvim`, prompt-injection via `chat_turn_pre`) are all extensions; the
-`chat`/`chat_ui`/`history` capabilities, the chat event pathway, the model registry +
-generic selector, and the `ami-*.nvim` packaging convention.
+history (`ami-history.nvim`), inline (`ami-inline.nvim`), proactive, persona, and
+git-context are all extensions; the `chat`/`chat_ui`/`history` capabilities, the
+event bus + **collector hooks** (`chat.system`, `context.extra`), the model registry +
+generic selector, extension health hooks, and the `ami-*.nvim` packaging convention.

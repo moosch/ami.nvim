@@ -13,8 +13,10 @@ Working through these in order, one at a time.
 - [x] **5. Extension health hooks** — `api.health(fn)` aggregated into `:checkhealth ami`.
       Done: core registry + health.lua renders a section per extension; chat/history/
       inline/proactive each contribute one.
-- [ ] **4. Context-provider extensions** — git diff / diagnostics / test output via
-      `context_assembled`.
+- [x] **4. Context-provider extensions** — done, plus the collector refactor it rode
+      in on: core `emit_collect`; collector hooks `chat.system` (persona migrated off
+      mutating req) and `context.extra` (folded into context.assemble); reference
+      provider `ami-context-git.nvim` (uncommitted diff).
 - [ ] **2. Automated test suite + CI** — headless specs for context.assemble, the
       session tree, event bus/registry, history provider; run in CI.
 

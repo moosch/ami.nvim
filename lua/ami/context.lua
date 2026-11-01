@@ -302,6 +302,20 @@ function M.assemble(refs, budget)
     end
   end
 
+  -- Context-provider contributions (git diff, diagnostics, …). Each handler of the
+  -- "context.extra" collector returns a string or { title, body }, or nil to skip.
+  for _, extra in ipairs(events.emit_collect("context.extra", { refs = refs })) do
+    local title, body
+    if type(extra) == "string" then
+      title, body = "Context", extra
+    elseif type(extra) == "table" then
+      title, body = extra.title or "Context", extra.body
+    end
+    if body and vim.trim(body) ~= "" then
+      sections[#sections + 1] = { title = title, body = body }
+    end
+  end
+
   if refs.project_root and refs.project_root ~= "" then
     for _, name in ipairs({ "README.md", "PLAN.md" }) do
       local data = read_file(refs.project_root .. "/" .. name)

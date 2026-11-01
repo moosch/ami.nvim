@@ -207,7 +207,9 @@ ami ships **no active extensions** itself. First-party ones, each in their own r
 - [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) — inline (FIM)
   completion; registers a `fim` model slot.
 - [`ami-persona.nvim`](https://github.com/moosch/ami-persona.nvim) — steer the
-  advisor's style ("be terse", a house voice) via `chat_turn_pre`.
+  advisor's style ("be terse", a house voice); a `chat.system` contributor.
+- [`ami-context-git.nvim`](https://github.com/moosch/ami-context-git.nvim) — feed your
+  uncommitted git diff into the advisor's context; a `context.extra` provider.
 - [`ami-proactive.nvim`](https://github.com/moosch/ami-proactive.nvim) —
   proactive suggestions; registers a `proactive` model slot.
 - [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) — a
