@@ -17,8 +17,14 @@ Working through these in order, one at a time.
       in on: core `emit_collect`; collector hooks `chat.system` (persona migrated off
       mutating req) and `context.extra` (folded into context.assemble); reference
       provider `ami-context-git.nvim` (uncommitted diff).
-- [ ] **2. Automated test suite + CI** — headless specs for context.assemble, the
-      session tree, event bus/registry, history provider; run in CI.
+- [x] **2. Automated test suite + CI** — done. A plenary-free headless runner
+      (`tests/`, `make test`) with 43 specs covering the event bus + collector hooks,
+      `context.assemble` (ordering/fences/budget), the model registry, and the
+      extension registry + api facade; a `test` job added to CI (push + PR). The
+      session tree / history provider live in `ami-history.nvim` and are the next
+      place to grow coverage.
+
+🎉 Backlog complete.
 
 Done: pure-Lua core (no daemon), history as an extension, swappable chat_ui,
 model registry, syntax-highlighted transcript, configurable keymaps everywhere.

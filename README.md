@@ -239,11 +239,14 @@ Pure Lua — nothing to build.
 
 ```sh
 make check   # verify VERSION == README badge
+make test    # run the headless Lua spec suite (needs only Neovim)
 make demos   # render the README demo GIFs (needs vhs + LM Studio)
 ```
 
 The plugin lives in `lua/ami` (core runtime) plus the first-party extension repos.
-CI runs the version check.
+Core logic is covered by a plenary-free headless spec suite under
+[`tests/`](tests/) (events, context assembly, the model registry, the extension
+registry). CI runs the version check and the tests on every push and PR.
 
 ## License
 

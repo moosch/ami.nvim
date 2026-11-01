@@ -1,10 +1,16 @@
-.PHONY: check demos optimize-demos
+.PHONY: check test demos optimize-demos
 
 # ami is now pure Lua — there is no build step. `check` verifies version
-# consistency; `demos` renders the README GIFs.
+# consistency; `test` runs the headless Lua spec suite; `demos` renders the
+# README GIFs.
 
 check:
 	scripts/check-version.sh
+
+# Run the headless spec suite (tests/*_spec.lua). Needs only Neovim — no plenary,
+# no LM Studio. Exits non-zero on any failure.
+test:
+	nvim --clean --headless -l tests/run.lua
 
 # Render the README demo GIFs. Requires `vhs` (https://github.com/charmbracelet/vhs)
 # and a running LM Studio. Override the endpoint/models via env, e.g.:

@@ -1,0 +1,156 @@
+-- Specs for ami.extensions: the registry (register/list/disable/dedupe), the API
+-- facade handed to setup() (config merge, commands, events, provide/resolve,
+-- emit_collect, health, the chat no-op proxy), setup_all's isolation, and _reset.
+local T = require("tests.minitest")
+local ext = require("ami.extensions")
+local events = require("ami.events")
+
+T.describe("extensions.register / list", function()
+  T.it("registers specs and lists them in order", function()
+    ext._reset()
+    ext.register({ name = "alpha" })
+    ext.register({ name = "beta" })
+    T.eq(ext.list(), { "alpha", "beta" })
+  end)
+
+  T.it("ignores a duplicate name", function()
+    ext._reset()
+    ext.register({ name = "dup" })
+    ext.register({ name = "dup" })
+    T.eq(ext.list(), { "dup" })
+  end)
+
+  T.it("skips a disabled extension", function()
+    ext._reset()
+    ext.disable({ "skipme" })
+    ext.register({ name = "skipme" })
+    ext.register({ name = "keep" })
+    T.eq(ext.list(), { "keep" })
+  end)
+
+  T.it("ignores an invalid spec (no name)", function()
+    ext._reset()
+    ext.register({ config = {} })
+    ext.register(42)
+    T.eq(ext.list(), {})
+  end)
+
+  T.it("a bad module-name string is logged, not fatal", function()
+    ext._reset()
+    ext.register("no.such.module.xyz")
+    T.eq(ext.list(), {})
+  end)
+end)
+
+T.describe("extensions.setup_all", function()
+  T.it("runs setup(api) with name + merged config, and emits `setup`", function()
+    ext._reset()
+    events.clear()
+    local got
+    local fired = false
+    events.on("setup", function() fired = true end)
+    ext.register({ name = "x", config = { a = 1, nested = { b = 2 } }, setup = function(api) got = api end })
+    ext.setup_all()
+    T.ok(got, "setup received an api")
+    T.eq(got.name, "x")
+    T.eq(got.config.a, 1)
+    T.eq(got.config.nested.b, 2)
+    T.ok(fired, "the `setup` event fired")
+  end)
+
+  T.it("registers declared commands", function()
+    ext._reset()
+    local ran = false
+    ext.register({ name = "c", commands = { AmiSpecCmd = { fn = function() ran = true end } } })
+    ext.setup_all()
+    T.eq(vim.fn.exists(":AmiSpecCmd"), 2)
+    vim.cmd("AmiSpecCmd")
+    T.ok(ran)
+  end)
+
+  T.it("subscribes declared events to the bus", function()
+    ext._reset()
+    events.clear()
+    local n = 0
+    ext.register({ name = "e", events = { buf_write = function() n = n + 1 end } })
+    ext.setup_all()
+    events.emit("buf_write", 1)
+    T.eq(n, 1)
+  end)
+
+  T.it("isolates a throwing setup; the others still run", function()
+    ext._reset()
+    local ran = false
+    ext.register({ name = "bad", setup = function() error("boom") end })
+    ext.register({ name = "good", setup = function() ran = true end })
+    ext.setup_all() -- must not propagate
+    T.ok(ran)
+  end)
+end)
+
+T.describe("capabilities: provide / resolve", function()
+  T.it("resolves a provided capability", function()
+    ext._reset()
+    ext.register({
+      name = "p",
+      setup = function(api) api.provide("thing", { hi = function() return "yo" end }) end,
+    })
+    ext.setup_all()
+    local impl = ext.resolve("thing")
+    T.ok(impl)
+    T.eq(impl.hi(), "yo")
+  end)
+
+  T.it("resolve returns nil for an unknown capability", function()
+    ext._reset()
+    T.falsy(ext.resolve("nope"))
+  end)
+end)
+
+T.describe("api.emit_collect (collector hooks)", function()
+  T.it("composes contributions from other extensions", function()
+    ext._reset()
+    events.clear()
+    ext.register({ name = "persona", events = { ["chat.system"] = function() return "be terse" end } })
+    local chat_api
+    ext.register({ name = "chat", setup = function(api) chat_api = api end })
+    ext.setup_all()
+    T.eq(chat_api.emit_collect("chat.system"), { "be terse" })
+  end)
+end)
+
+T.describe("api.health", function()
+  T.it("collects a health check tagged with the extension name", function()
+    ext._reset()
+    ext.register({ name = "h", setup = function(api) api.health(function(_) end) end })
+    ext.setup_all()
+    local checks = ext.health_checks()
+    T.eq(#checks, 1)
+    T.eq(checks[1].name, "h")
+  end)
+end)
+
+T.describe("api.chat proxy", function()
+  T.it("is a safe no-op when no chat extension is loaded", function()
+    ext._reset()
+    local api
+    ext.register({ name = "x", setup = function(a) api = a end })
+    ext.setup_all()
+    api.chat.append("hi") -- must not raise
+    api.chat.open()
+    T.eq(api.chat.session(), "default")
+    T.falsy(api.chat.is_streaming())
+  end)
+end)
+
+T.describe("extensions._reset", function()
+  T.it("clears registry, providers, and health checks", function()
+    ext._reset()
+    ext.register({ name = "z", setup = function(api) api.provide("c", {}) end })
+    ext.setup_all()
+    ext._reset()
+    T.eq(ext.list(), {})
+    T.falsy(ext.resolve("c"))
+    T.eq(#ext.health_checks(), 0)
+  end)
+end)
