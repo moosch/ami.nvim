@@ -79,6 +79,34 @@ function M.setup(opts)
   events.install()
   models.setup() -- register the default model slot
 
+  -- Contribute /model and /models as chat slash-commands (the model registry is a
+  -- core feature). Harmless without a chat extension — nothing emits chat.commands.
+  events.on("chat.commands", function()
+    return {
+      model = {
+        desc = "Pick a model for a slot (/model [slot])",
+        fn = function(ctx)
+          local slot = vim.trim(ctx.args or "")
+          if slot ~= "" then
+            models.select(slot)
+          else
+            models.pick()
+          end
+        end,
+      },
+      models = {
+        desc = "Show each slot's current model",
+        fn = function(ctx)
+          local lines = { "", "**Models**", "" }
+          for _, name in ipairs(models.slot_names()) do
+            lines[#lines + 1] = ("- `%s` — %s"):format(name, models.effective(name).model or "(unset)")
+          end
+          ctx.append("\n" .. table.concat(lines, "\n") .. "\n")
+        end,
+      },
+    }
+  end)
+
   -- Extensions: skip any the user disabled, register the rest (specs or module
   -- names), then run their setup(). ami core ships no active extensions itself.
   extensions.disable(config.options.disable_extensions)
