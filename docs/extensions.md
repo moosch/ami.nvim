@@ -117,11 +117,23 @@ Declared collector hooks:
 | --- | --- | --- |
 | `chat.system` | a system-message string (or nil) | ami-chat appends it after the advisor prompt — used by `ami-persona` |
 | `context.extra` | `{ title, body }` or a string (or nil) | core `context.assemble` adds it as a context section within the token budget — used by `ami-context-git` |
+| `chat.commands` | a `{ name = { desc, fn } }` table of slash commands (or nil) | ami-chat merges them into the input's `/command` dispatcher — used by `ami-history` (`/compact`) |
 
 ```lua
 -- contribute to the context sent on every turn:
 api.on("context.extra", function(info)       -- info.refs has project_root, active_path, …
   return { title = "Test output", body = cached_test_output }  -- or nil to add nothing
+end)
+
+-- contribute chat slash-commands (typed into the chat input as /name args):
+api.on("chat.commands", function()
+  return {
+    mycmd = {
+      desc = "What it does (shown by /help)",
+      -- ctx = { args, session, append(text), controller }
+      fn = function(ctx) ctx.append("\n_ran /mycmd with: " .. ctx.args .. "_\n") end,
+    },
+  }
 end)
 ```
 
