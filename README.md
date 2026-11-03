@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.13.0).** It works day to day but hasn't been
+> ⚠️ **Status: early / experimental (v0.14.0).** It works day to day but hasn't been
 > widely battle-tested — expect sharp edges, and pin a commit if you depend on it.
 > Feedback and issues welcome.
 
@@ -12,9 +12,7 @@ occasional proactive suggestion, but it **never edits your files**. Built to kee
 you in control and in practice, backed entirely by local models via
 [LM Studio](https://lmstudio.ai/).
 
-It's **pure Lua** — no daemon, no build step. ami talks to LM Studio directly over
-the OpenAI-compatible API (via `curl`), so it's model-agnostic. The core is a small
-runtime; every feature is an extension.
+`ami` talks to your Ollama/LM Studio (among others) server directly over the OpenAI-compatible API (via `curl`), so it's model-agnostic. The core is small and features are extensions.
 
 ## Features
 
@@ -82,7 +80,7 @@ the model registry + runtime; install `ami-chat.nvim` for the chat panel and
 
 ## Quick start
 
-1. Start LM Studio and load a model (defaults assume `http://localhost:1234/v1`).
+1. Start Ollama/LM Studio and load a model (defaults assume `http://localhost:1234/v1` for LM Studio).
 2. Open a project in Neovim.
 3. `:AmiChat`, type a question, `<Esc>` then `<Enter>` to send.
 4. In insert mode, `<C-g>` requests an inline completion; `<Tab>` accepts it.
