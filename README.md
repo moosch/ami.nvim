@@ -235,8 +235,7 @@ Neovim (Lua) ──curl (HTTP + SSE)──▶ LM Studio
   extensions: chat (builds the request + streams), history, inline, proactive
 ```
 
-ami talks to LM Studio **directly** over the OpenAI-compatible API — no daemon, no
-separate process, no build step. The chat extension assembles each request (system
+The chat extension assembles each request (system
 prompt + context + prior turns from the history provider + your message) and streams
 the reply straight from the model.
 
