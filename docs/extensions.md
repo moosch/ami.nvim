@@ -82,7 +82,7 @@ User config for an extension lives under its `name`
 | `api.command(name, spec)` | register a `:Name` command (`{desc,nargs,range,complete,fn}`) |
 | `api.provide(cap, impl)` | offer a provider for a named capability (see below) |
 | `api.resolve(cap)` | look up a capability provider (or nil) |
-| `api.chat` | proxies the `chat` capability (from a chat extension; no-ops if none): `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()` |
+| `api.chat` | proxies the `chat` capability (from a chat extension; no-ops if none): `add_proactive`, `append`, `open`, `session()`, `model()`, `source()`, `set_source(buf,win)`, `is_streaming()`, `cancel()` |
 | `api.client` | `stream_chat(endpoint, body, cbs)`, `complete(endpoint, body, cb, opts)`, `models_from(endpoint, cb)` — the OpenAI-compatible LM Studio client (direct, no daemon) |
 | `api.context` | `gather_async(bufnr, win, selection, range, cb)`, `assemble(refs, budget)`, `project_root(bufnr)`, `last_selection()` |
 | `api.models` | `register(slot)`, `default()`, `effective(name)` — the model registry (below) |
@@ -155,6 +155,20 @@ Chat is an extension ([`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim)
 and more. Core's `api.chat` proxies to it, so other extensions (e.g. proactive)
 reach the panel without depending on ami-chat directly; the calls are safe no-ops if
 no chat extension is loaded.
+
+A feature that **streams its own request into the panel** (rather than through the
+advisor reply) should let the user stop it with the same `<C-c>` / `:AmiStop`. The
+chat capability exposes a cancel registry for exactly that:
+
+| Method | Contract |
+| --- | --- |
+| `register_cancel(fn)` | register a canceller for an in-flight stream; returns an opaque token. `fn` kills your request. |
+| `unregister_cancel(token)` | drop the canceller once the stream settles (done/error). |
+| `cancel()` | stop everything streaming into the panel — the advisor reply and every registered producer; returns `true` if it stopped something. |
+
+`ami-doc` uses this: it `register_cancel`s before streaming a document, kills the
+`curl` handle on cancel (folding the partial text away and leaving the file
+unwritten), and `unregister_cancel`s in its `on_done`/`on_error`.
 
 ### `history` — conversation memory
 
