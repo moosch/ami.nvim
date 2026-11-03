@@ -58,13 +58,17 @@ sandbox) and deserves regression coverage — plus `strip_outer_fence`.
 
 Repos: `ami-chat.nvim`, `ami-doc.nvim` (per-repo `tests/` + a `make test`).
 
-## 5. Context-budget indicator
+## 5. Context-budget indicator — *done*
 
-Now that `/compact` exists, show what's being compacted: an approximate token count
-in the chat header (`~3.2k / 8k`). `context.estimate_tokens` already exists; mostly
-plumbing it to the window title.
+Shows what's being compacted: a running estimate of the request size.
 
-Repos: `ami-chat.nvim` (+ expose `estimate_tokens` via `api.context` if not already).
+- [x] header indicator in the panel title (`~3.2k`, or `~3.2k/32k` with
+      `chat.context_window` set), updated each turn.
+- [x] `/tokens` prints a breakdown (instructions / context / history / message /
+      total) — history flagged as what `/compact` reduces.
+- [x] optional `set_tokens(total, window?)` on the `chat_ui` contract.
+
+Repos: `ami-chat.nvim`.
 
 ## 6. Diagnostics-aware context / `/fix`
 
