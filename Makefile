@@ -19,6 +19,7 @@ demos:
 	vhs demos/inline.tape
 	vhs demos/chat.tape
 	vhs demos/model.tape
+	AMI_DEMO_DOC=1 vhs demos/doc.tape
 	@$(MAKE) optimize-demos
 
 # Shrink the rendered GIFs for GitHub (best-effort; no-op without gifsicle).

@@ -17,6 +17,7 @@ alone.
 | `inline.tape` | comment-driven FIM completion | [`ami-inline.nvim`](https://github.com/moosch/ami-inline.nvim) |
 | `chat.tape` | the chat advisor panel | [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) |
 | `model.tape` | the model registry / `:AmiModel` | core, with `chat`/`fim` slots from the two above |
+| `doc.tape` | `/doc` document generation into the repo | [`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim) |
 
 ## Prerequisites
 
@@ -44,6 +45,11 @@ make demos
 
 `make demos` renders every tape, then (if `gifsicle` is installed) optimizes the
 GIFs in place. To render a single one: `vhs demos/inline.tape`.
+
+`doc.tape` needs `ami-doc.nvim` checked out as a sibling and launches with
+`AMI_DEMO_DOC=1` (so the `doc` extension loads only for this demo); render it with
+`AMI_DEMO_DOC=1 vhs demos/doc.tape`. It writes `EXAMPLE.md` into a throwaway
+`/tmp/ami_doc_demo` project, not this repo.
 
 `chat.tape` defaults its chat model to **`deepseek-coder`** (fast replies that
 keep the GIF short); set `AMI_CHAT_MODEL` to override. It shows the advisor panel

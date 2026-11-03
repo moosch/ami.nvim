@@ -12,6 +12,7 @@ vim.opt.runtimepath:append(root)
 local parent = vim.fn.fnamemodify(root, ":h")
 vim.opt.runtimepath:append(parent .. "/ami-chat.nvim")
 vim.opt.runtimepath:append(parent .. "/ami-inline.nvim")
+vim.opt.runtimepath:append(parent .. "/ami-doc.nvim")
 
 vim.o.termguicolors = true
 vim.o.number = true
@@ -22,9 +23,15 @@ vim.o.swapfile = false
 
 local endpoint = os.getenv("AMI_ENDPOINT") or "http://localhost:1234/v1"
 
--- Load the chat + inline extensions if their repos are on the runtimepath.
+-- Load the chat + inline extensions if their repos are on the runtimepath. The doc
+-- extension is opt-in per demo (AMI_DEMO_DOC=1) so it doesn't add a /doc command or a
+-- "doc" model slot to the other demos.
+local mods = { "ami-chat", "ami-inline" }
+if os.getenv("AMI_DEMO_DOC") then
+  mods[#mods + 1] = "ami-doc"
+end
 local extensions = {}
-for _, mod in ipairs({ "ami-chat", "ami-inline" }) do
+for _, mod in ipairs(mods) do
   local ok, ext = pcall(require, mod)
   if ok then
     extensions[#extensions + 1] = ext

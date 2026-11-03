@@ -104,6 +104,12 @@ Chat advisor — discuss a problem, get advice-only feedback
 
 ![chat advisor demo](demos/chat.gif)
 
+Document generation — `/doc PATH …` writes a file into the repo and opens it (the
+advisor never writes files; this opts in)
+([`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim)):
+
+![doc generation demo](demos/doc.gif)
+
 Runtime model registry — pick the model for any slot
 (core `:AmiModel`; the `chat`/`fim` slots come from
 [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) /
