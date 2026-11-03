@@ -2,7 +2,7 @@
 
 *ami — "friend" in French.* A pair programmer that sits with you, not ahead of you.
 
-> ⚠️ **Status: early / experimental (v0.12.0).** It works day to day but hasn't been
+> ⚠️ **Status: early / experimental (v0.13.0).** It works day to day but hasn't been
 > widely battle-tested — expect sharp edges, and pin a commit if you depend on it.
 > Feedback and issues welcome.
 
