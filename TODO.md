@@ -49,14 +49,23 @@ Possible later: apply a ```diff/patch block directly via `git apply` (confirm-ga
 
 Repos: `ami-chat.nvim`.
 
-## 4. Extend the test suite to the extensions' pure functions
+## 4. Test suites in the extension repos — *done*
 
-The headless harness (ai-harness/tests) covers core only. Juicy untested pure
-functions: `ami-chat.ui._recall` (up/down state machine), `controller.parse_command`,
-and especially **`ami-doc.resolve_path`** — it's a security boundary (the project-root
-sandbox) and deserves regression coverage — plus `strip_outer_fence`.
+Each extension gets its own standalone headless suite (vendored `minitest.lua`, a
+`run.lua` that locates ami core, `make test`, and CI), with the coverage written while
+building #1–#3 ported into committed specs.
 
-Repos: `ami-chat.nvim`, `ami-doc.nvim` (per-repo `tests/` + a `make test`).
+- [x] `ami-chat.nvim/tests/` — cancel registry, `@file` resolve + file_list, `_complete`,
+      `_recall`, `/yank`+`/apply` (incl. the path sandbox), the token estimate + `/tokens`.
+      **50 specs.**
+- [x] `ami-doc.nvim/tests/` — write-on-done, outer-fence strip, **project-root sandbox**,
+      instructions required, and cancellation. **5 specs.**
+- [x] `run.lua` finds core via `$AMI_CORE` or a sibling checkout; CI checks out
+      `moosch/ami.nvim` into `.ami-core` and sets `AMI_CORE`.
+- Possible later: the same harness for ami-history / ami-persona / ami-context-git /
+  ami-inline / ami-proactive (no committed coverage yet).
+
+Repos: `ami-chat.nvim`, `ami-doc.nvim`.
 
 ## 5. Context-budget indicator — *done*
 

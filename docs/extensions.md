@@ -274,6 +274,7 @@ Structure it like any Neovim plugin:
 ```
 your-ami-ext.nvim/
   lua/your-ami-ext/init.lua   -- returns the spec
+  tests/                      -- optional headless specs (see below)
   README.md
   LICENSE
 ```
@@ -282,6 +283,23 @@ Users install it with their plugin manager and add `require("your-ami-ext")` to
 `extensions`. Reach ami only through `api.*` (and the LM Studio provider via
 `api.client`) so you don't couple to internals. By convention, name the repo
 `ami-*.nvim`.
+
+### Testing an extension
+
+Extensions reach ami only through the injected `api`, which makes them easy to test
+with a fake `api` — no LM Studio, no plugin manager. [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim)
+and [`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim) each ship a standalone
+headless suite you can copy:
+
+- vendor core's zero-dependency `tests/minitest.lua`;
+- a `tests/run.lua` that puts your `lua/` and ami core's `lua/` on `package.path`
+  (it finds core via `$AMI_CORE` or a sibling `../ami.nvim` / `../ai-harness` checkout)
+  and loads every `tests/*_spec.lua`;
+- a `make test` target and a CI job that checks out `moosch/ami.nvim` alongside.
+
+Expose a security-relevant internal (a path sandbox, a parser) as `M._name` so a spec
+can pin it directly — as ami-chat does with `_resolve_refs` and ami-doc's specs do for
+the project-root sandbox.
 
 ---
 
