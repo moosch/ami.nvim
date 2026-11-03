@@ -209,8 +209,16 @@ end
 | `read_input()` | return the current draft text |
 | `clear_input()` | clear the draft |
 
-Implement every method — the controller assumes the whole contract and does not
-mix a custom renderer with the bundled one (they wouldn't share buffers). Use
+Two methods are **optional** — a renderer may omit them, and callers fall back to a
+plain `append`:
+
+| Method | Contract |
+| --- | --- |
+| `mark()` | return an opaque handle for the current transcript end (survives later appends) |
+| `collapse(handle, text?)` | remove everything appended since `handle`, then append `text` — lets a feature stream content in and fold it away (e.g. `ami-doc` streams a document, then collapses it to one `✓ wrote …` line) |
+
+Implement every required method — the controller assumes the whole contract and does
+not mix a custom renderer with the bundled one (they wouldn't share buffers). Use
 ami-chat's bundled `lua/ami-chat/ui.lua` (floating panel) as the reference, or
 [`ami-chat-split.nvim`](https://github.com/moosch/ami-chat-split.nvim) for a
 split-window `chat_ui` packaged as its own repo.
