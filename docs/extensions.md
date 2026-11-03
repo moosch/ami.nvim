@@ -21,6 +21,8 @@ completion — a model slot),
 (a `chat.system` contributor), and
 [`ami-context-git.nvim`](https://github.com/moosch/ami-context-git.nvim)
 (a `context.extra` provider — feeds your uncommitted diff), and
+[`ami-context-lsp.nvim`](https://github.com/moosch/ami-context-lsp.nvim)
+(a `context.extra` provider + `/fix` — makes ami diagnostics-aware), and
 [`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim)
 (a `chat.commands` contributor — `/doc` generates a document into the repo; the one
 extension that *writes files*, opt-in, since core never does). A tiny in-tree template
@@ -119,7 +121,7 @@ Declared collector hooks:
 | Hook | A handler returns | Composed by |
 | --- | --- | --- |
 | `chat.system` | a system-message string (or nil) | ami-chat appends it after the advisor prompt — used by `ami-persona` |
-| `context.extra` | `{ title, body }` or a string (or nil) | core `context.assemble` adds it as a context section within the token budget — used by `ami-context-git` |
+| `context.extra` | `{ title, body }` or a string (or nil) | core `context.assemble` adds it as a context section within the token budget — used by `ami-context-git` (git diff) and `ami-context-lsp` (diagnostics) |
 | `chat.commands` | a `{ name = { desc, fn } }` table of slash commands (or nil) | ami-chat merges them into the input's `/command` dispatcher — used by `ami-history` (`/compact`) |
 
 ```lua
@@ -307,8 +309,9 @@ the project-root sandbox.
 
 Tracked here until done. PRs/ideas welcome.
 
-1. **More context providers** on `context.extra`: LSP diagnostics, test/build
-   output, a project-conventions file (git diff shipped in `ami-context-git.nvim`).
+1. **More context providers** on `context.extra`: test/build output, a
+   project-conventions file (git diff shipped in `ami-context-git.nvim`; LSP
+   diagnostics + a `/fix` command in `ami-context-lsp.nvim`).
 2. **rtp auto-discovery** of installed extensions, and **project-local
    `.ami/extensions/`** loaded only after a trust prompt (Pi's project-trust model).
 3. **Fancier history** providers (semantic search / summarizing memory) against the

@@ -79,11 +79,16 @@ Shows what's being compacted: a running estimate of the request size.
 
 Repos: `ami-chat.nvim`.
 
-## 6. Diagnostics-aware context / `/fix`
+## 6. Diagnostics-aware context / `/fix` — *done*
 
-A `/fix` command (or auto-including the current buffer's LSP diagnostics via the
-`context.extra` collector) turns "why is this erroring" into one keystroke. Fits the
-collector-hook model; could be its own `ami-context-lsp.nvim` mirroring
-`ami-context-git.nvim`.
+New extension `ami-context-lsp.nvim` (mirrors `ami-context-git.nvim`):
 
-Repos: new `ami-context-lsp.nvim`, or `ami-chat.nvim`.
+- [x] `context.extra` provider — folds the active file's LSP diagnostics (errors +
+      warnings, with the offending source line) into every turn's context; read from
+      `vim.diagnostic`, severity-filtered, capped, clean file adds nothing.
+- [x] `/fix [notes]` (and `:AmiFix`) — asks the advisor for the smallest fix per
+      diagnostic; relies on the context above, embeds the diagnostics itself when
+      `auto = false`.
+- [x] standalone headless suite (12 specs) + CI; registered in the ai-harness docs.
+
+Repo: new `ami-context-lsp.nvim` (initial commit local; user creates the GitHub repo).

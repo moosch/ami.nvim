@@ -216,6 +216,9 @@ ami ships **no active extensions** itself. First-party ones, each in their own r
   advisor's style ("be terse", a house voice); a `chat.system` contributor.
 - [`ami-context-git.nvim`](https://github.com/moosch/ami-context-git.nvim) — feed your
   uncommitted git diff into the advisor's context; a `context.extra` provider.
+- [`ami-context-lsp.nvim`](https://github.com/moosch/ami-context-lsp.nvim) — make ami
+  diagnostics-aware: the active file's LSP errors/warnings as context, plus a `/fix`
+  command; a `context.extra` provider.
 - [`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim) — generate documents into
   the repo on request (`/doc PATH …`); the one extension that **writes files**, opt-in,
   since core and the advisor never do.
