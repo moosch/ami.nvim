@@ -20,7 +20,10 @@ completion — a model slot),
 [`ami-persona.nvim`](https://github.com/moosch/ami-persona.nvim)
 (a `chat.system` contributor), and
 [`ami-context-git.nvim`](https://github.com/moosch/ami-context-git.nvim)
-(a `context.extra` provider — feeds your uncommitted diff). A tiny in-tree template
+(a `context.extra` provider — feeds your uncommitted diff), and
+[`ami-doc.nvim`](https://github.com/moosch/ami-doc.nvim)
+(a `chat.commands` contributor — `/doc` generates a document into the repo; the one
+extension that *writes files*, opt-in, since core never does). A tiny in-tree template
 lives at `lua/ami/extensions/example.lua`.
 
 ## Registering an extension
