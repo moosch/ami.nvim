@@ -51,6 +51,19 @@ GIFs in place. To render a single one: `vhs demos/inline.tape`.
 `AMI_DEMO_DOC=1 vhs demos/doc.tape`. It writes `EXAMPLE.md` into a throwaway
 `/tmp/ami_doc_demo` project, not this repo.
 
+ami-doc doesn't stream into the chat, so the raw render has a static "writing…"
+stretch while the model works. The committed `doc.gif` has that gap (and the long
+static tail) trimmed out with `ffmpeg`'s `select` filter — keep the command + reveal,
+drop the wait. Adjust the two time windows to match your render's timings:
+
+```sh
+ffmpeg -y -i demos/doc.gif -filter_complex \
+  "[0:v]select='lt(t,14)+between(t,19.5,23.5)',setpts=N/FRAME_RATE/TB,fps=24,\
+   split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" \
+  demos/doc.trimmed.gif && mv demos/doc.trimmed.gif demos/doc.gif
+# lt(t,14): keep intro+command up to ~14s · between(…): keep the reveal window
+```
+
 `chat.tape` defaults its chat model to **`deepseek-coder`** (fast replies that
 keep the GIF short); set `AMI_CHAT_MODEL` to override. It shows the advisor panel
 in its default look — right-docked and semi-transparent, so the source file stays

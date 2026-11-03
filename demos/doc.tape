@@ -37,14 +37,16 @@ Sleep 2s           # let the editor settle
 Show
 Sleep 1500ms       # show the X11 stub first
 
-# --- open chat and ask ami to write a full learning-resource doc ---
+# --- open chat and ask ami to write a short annotated doc ---
 Type ":AmiChat"
 Enter
 Sleep 2s           # the right-docked panel slides in
-Type "/doc EXAMPLE.md a compact, well-commented example of opening a window with X11 in C, with a short explanation of each step as a learning resource"
+Type "/doc EXAMPLE.md a minimal annotated example of opening a window with X11 in C: one code block and a short explanation of each step"
 Escape
 Enter
 
 # --- ami writes EXAMPLE.md in the project root and opens it in a split ---
+# The static "writing…" stretch is trimmed out of the committed GIF (see the repo's
+# demos notes); a full `vhs` render waits the whole generation time here.
 Sleep 2s           # "writing EXAMPLE.md…"
-Sleep 30s          # generation, then the written file opens beside the stub
+Sleep 22s          # generation, then the written file opens beside the stub
