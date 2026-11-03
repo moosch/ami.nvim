@@ -32,13 +32,20 @@ file-completion popup reusing the `/` machinery.
 
 Repos: `ami.nvim` (core), `ami-chat.nvim`.
 
-## 3. Bridge advisor → action (user-initiated, keeps "advise, don't act")
+## 3. Bridge advisor → action (user-initiated, keeps "advise, don't act") — *done*
 
-The advisor never writes — good. But the user often wants the output:
-- `/yank` (or a keymap) to copy the Nth fenced code block from the transcript.
-- A confirm-gated "apply this suggestion as a diff" preview.
+The advisor never writes — good. These let the user act on a snippet, always as the
+one who commits the change:
+
+- [x] `/yank [N]` (and `:AmiYank`): copy the Nth fenced code block to the clipboard.
+- [x] `/apply [N] [path]` (and `:AmiApply`): open the block in a diff against a file
+      (chat source by default, or a sandboxed `path`); user merges with `do`/`dp` and
+      `:w` — ami writes nothing.
+- [x] optional `transcript_lines()` on the `chat_ui` contract so the controller can
+      read code blocks back out of the transcript.
 
 Both are user-triggered, so the guarantee holds (same shape as `!shell` / ami-doc).
+Possible later: apply a ```diff/patch block directly via `git apply` (confirm-gated).
 
 Repos: `ami-chat.nvim`.
 

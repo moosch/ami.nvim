@@ -204,7 +204,9 @@ require("ami").setup({
 ami ships **no active extensions** itself. First-party ones, each in their own repo:
 
 - [`ami-chat.nvim`](https://github.com/moosch/ami-chat.nvim) — the chat advisor
-  panel; provides the `chat` capability and a `chat` model slot.
+  panel; provides the `chat` capability and a `chat` model slot. Slash commands with a
+  popup (`/help`, `/yank`, `/apply`, …), `@file` references, `!shell` passthrough,
+  interruptible replies (`<C-c>`), and `/yank`/`/apply` to act on the advisor's code.
 - [`ami-history.nvim`](https://github.com/moosch/ami-history.nvim) — the branching
   history tree + persistence + `:AmiTree`; provides the `history` capability
   (prior-turn context) by listening to the chat events.

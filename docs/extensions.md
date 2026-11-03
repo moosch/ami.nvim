@@ -230,6 +230,7 @@ plain `append`:
 | --- | --- |
 | `mark()` | return an opaque handle for the current transcript end (survives later appends) |
 | `collapse(handle, text?)` | remove everything appended since `handle`, then append `text` — lets a feature stream content in and fold it away (e.g. `ami-doc` streams a document, then collapses it to one `✓ wrote …` line) |
+| `transcript_lines()` | return the transcript as a list of lines — lets the controller read the conversation back (e.g. `/yank` and `/apply` pull a fenced code block out of it) |
 
 Implement every required method — the controller assumes the whole contract and does
 not mix a custom renderer with the bundled one (they wouldn't share buffers). Use
