@@ -4,8 +4,9 @@
 # loaded by demos/init.lua alongside ami core + ami-chat when AMI_DEMO_DOC=1.
 #
 # ami's advisor never writes files; ami-doc is the opt-in that lets you ask for one.
-# Here we open an X11 stub, then /doc a complete annotated EXAMPLE.md next to it —
-# ami writes the file (in the project root) and opens it in a split.
+# Here we open an X11 stub, then /doc a short annotated EXAMPLE.md next to it — ami
+# streams the document into the chat as it's written, then saves the file (in the
+# project root) and opens it in a split.
 #
 # Record with:  vhs demos/doc.tape   (needs `vhs` + a running LM Studio, with
 # ami-chat.nvim and ami-doc.nvim checked out next to this repo).
@@ -45,8 +46,5 @@ Type "/doc EXAMPLE.md a minimal annotated example of opening a window with X11 i
 Escape
 Enter
 
-# --- ami writes EXAMPLE.md in the project root and opens it in a split ---
-# The static "writing…" stretch is trimmed out of the committed GIF (see the repo's
-# demos notes); a full `vhs` render waits the whole generation time here.
-Sleep 2s           # "writing EXAMPLE.md…"
-Sleep 22s          # generation, then the written file opens beside the stub
+# --- ami streams the document into the chat, then saves + opens it in a split ---
+Sleep 16s          # the doc streams in live; then EXAMPLE.md opens beside the stub
