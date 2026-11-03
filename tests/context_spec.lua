@@ -78,6 +78,50 @@ T.describe("context.assemble", function()
     T.contains(out, "hello") -- the extra contribution
   end)
 
+  T.it("includes explicit_paths as Referenced file sections, above deps", function()
+    events.clear()
+    local root = vim.fn.tempname()
+    vim.fn.mkdir(root, "p")
+    local ref = root .. "/notes.md"
+    local dep = root .. "/dep.lua"
+    vim.fn.writefile({ "referenced body" }, ref)
+    vim.fn.writefile({ "return 42" }, dep)
+
+    local out = context.assemble({
+      project_root = root,
+      active_path = root .. "/main.lua",
+      active_content = "print(1)",
+      explicit_paths = { ref },
+      dep_paths = { dep },
+    }, 8000)
+
+    local function pos(h) return (out:find(h, 1, true)) or math.huge end
+    T.contains(out, "## Referenced file: notes.md")
+    T.contains(out, "referenced body") -- read from disk
+    T.ok(pos("## Active file: main.lua") < pos("## Referenced file: notes.md"), "active before referenced")
+    T.ok(pos("## Referenced file: notes.md") < pos("## Dependency: dep.lua"), "referenced before dependency")
+  end)
+
+  T.it("does not duplicate a file that is both referenced and a dep (or active)", function()
+    events.clear()
+    local root = vim.fn.tempname()
+    vim.fn.mkdir(root, "p")
+    local f = root .. "/shared.lua"
+    vim.fn.writefile({ "shared" }, f)
+
+    local out = context.assemble({
+      project_root = root,
+      active_path = root .. "/main.lua",
+      active_content = "x",
+      explicit_paths = { f },
+      dep_paths = { f }, -- same file as a dep: must appear once, as the reference
+    }, 8000)
+
+    local _, n = out:gsub("## Referenced file: shared.lua", "")
+    T.eq(n, 1)
+    T.excludes(out, "## Dependency: shared.lua")
+  end)
+
   T.it("accepts a plain string from a context.extra handler", function()
     events.clear()
     events.on("context.extra", function() return "just a string" end)

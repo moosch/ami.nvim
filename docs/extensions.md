@@ -92,7 +92,7 @@ User config for an extension lives under its `name`
 | Event | Payload | When |
 | --- | --- | --- |
 | `setup` | — | after `ami.setup()` finishes |
-| `context_assembled` | `(ctx, meta)` | context ready; handlers may **mutate `ctx`** (add `dep_paths`, notes, …) |
+| `context_assembled` | `(ctx, meta)` | context ready; handlers may **mutate `ctx`** (add `dep_paths`, `explicit_paths` — user-named files rendered as "Referenced file" sections — notes, …) |
 | `chat_session` | `{ session }` | a chat session is started/switched |
 | `chat_turn_pre` | `(req)` | before a chat turn streams; handlers may **mutate `req`** (`{model, messages, stream}`) |
 | `chat_turn_post` | `{ session, ok, user, assistant, error? }` | after a turn finishes/errors; carries the full user + assistant text (how a history provider records) |

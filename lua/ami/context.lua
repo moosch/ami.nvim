@@ -292,6 +292,19 @@ function M.assemble(refs, budget)
   end
 
   local seen = { [refs.active_path or ""] = true }
+
+  -- Files the user named explicitly (e.g. @path in the chat input). Ranked above
+  -- auto-resolved deps because the user asked for them on purpose.
+  for _, p in ipairs(refs.explicit_paths or {}) do
+    if p ~= "" and not seen[p] then
+      seen[p] = true
+      local data = read_file(p)
+      if data then
+        sections[#sections + 1] = { title = "Referenced file: " .. relpath(refs.project_root, p), body = data }
+      end
+    end
+  end
+
   for _, p in ipairs(refs.dep_paths or {}) do
     if p ~= "" and not seen[p] then
       seen[p] = true

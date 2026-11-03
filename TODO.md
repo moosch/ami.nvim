@@ -17,13 +17,20 @@ Stop an in-flight reply mid-stream (wrong model, typo, runaway length).
 
 Repos: `ami-chat.nvim`, `ami-doc.nvim`.
 
-## 2. `@file` references in chat input
+## 2. `@file` references in chat input — *done*
 
-Type `@path/to/file` to pull a specific file into the request context. Reuses the
-`/` completion-popup machinery (swap the source from commands to a project-root
-file walker). The natural third member alongside `/command` and `!shell`.
+Type `@path/to/file` to pull a specific file into the request context, with a
+file-completion popup reusing the `/` machinery.
 
-Repos: `ami-chat.nvim` (+ a `context.extra` style seam in core if needed).
+- [x] core: `assemble` reads `refs.explicit_paths` → "Referenced file" sections,
+      ranked above auto-resolved deps, de-duped against active/deps.
+- [x] controller: `_resolve_refs` (parse `@tokens`, sandbox to project root, skip
+      non-files/prose), `file_list` (cached, ignore-pruned walk), "attached" note.
+- [x] ui: `@` trigger + `_complete` serves files as well as commands.
+- Possible later: fuzzy/substring matching (native pum filters by prefix), and an
+  opt-in to reference files *outside* the project root.
+
+Repos: `ami.nvim` (core), `ami-chat.nvim`.
 
 ## 3. Bridge advisor → action (user-initiated, keeps "advise, don't act")
 
